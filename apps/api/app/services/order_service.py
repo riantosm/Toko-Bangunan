@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.job import Job
+from app.models.processed_request import ProcessedRequest
 from app.models.order import Order, OrderItem
 from app.models.product import Product
 from app.repositories import order_repo
@@ -44,10 +45,27 @@ async def create_order(session: AsyncSession, payload: OrderCreate) -> Order:
 
 
 async def enqueue_intake(
-    session: AsyncSession, customer_name: str, body: str
+    session: AsyncSession,
+    customer_name: str,
+    body: str,
+    idempotency_key: str | None = None,
 ) -> Job:
+    if idempotency_key:
+        seen = await session.get(ProcessedRequest, idempotency_key)
+        if seen is not None:
+            existing = await session.get(Job, seen.response["job_id"])
+            if existing is not None:
+                return existing
+
     job = Job(type="order_intake", status="queued", progress=0)
     session.add(job)
+    await session.flush()
+
+    if idempotency_key:
+        session.add(
+            ProcessedRequest(key=idempotency_key, response={"job_id": job.id})
+        )
+
     await session.commit()
 
     queue = await get_queue()

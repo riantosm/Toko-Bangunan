@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
@@ -30,10 +30,11 @@ async def create_order(
 async def intake_order(
     payload: OrderIntakeRequest,
     response: Response,
+    idempotency_key: str | None = Header(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> OrderIntakeResponse:
     job = await order_service.enqueue_intake(
-        session, payload.customer_name, payload.body
+        session, payload.customer_name, payload.body, idempotency_key
     )
     response.headers["Location"] = f"/jobs/{job.id}"
     return OrderIntakeResponse(job_id=job.id)

@@ -108,3 +108,19 @@ async def test_intake_endpoint_returns_202(client, monkeypatch) -> None:
     assert r.status_code == 202
     assert "job_id" in r.json()
     fake_queue.enqueue_job.assert_awaited_once()
+
+
+async def test_intake_endpoint_is_idempotent(client, monkeypatch) -> None:
+    fake_queue = AsyncMock()
+    monkeypatch.setattr(
+        order_service, "get_queue", AsyncMock(return_value=fake_queue)
+    )
+    headers = {"Idempotency-Key": "key-abc-123"}
+    body = {"customer_name": "Andi", "body": "x"}
+
+    r1 = await client.post("/orders/intake", json=body, headers=headers)
+    r2 = await client.post("/orders/intake", json=body, headers=headers)
+
+    assert r1.status_code == 202
+    assert r1.json()["job_id"] == r2.json()["job_id"]
+    assert fake_queue.enqueue_job.await_count == 1
