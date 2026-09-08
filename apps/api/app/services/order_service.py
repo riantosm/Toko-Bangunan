@@ -19,7 +19,7 @@ async def create_order(session: AsyncSession, payload: OrderCreate) -> Order:
     missing = product_ids - products.keys()
     if missing:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"produk tidak ditemukan: {sorted(missing)}",
         )
 
