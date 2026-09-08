@@ -83,3 +83,35 @@ export async function getJob(id: string): Promise<Job> {
   if (!res.ok) throw new Error(`GET /jobs/${id} -> ${res.status}`);
   return res.json();
 }
+
+export type WorkflowStep = {
+  id: number;
+  order_id: number;
+  seq: number;
+  step_type_name: string;
+  assigned_at: string | null;
+  completed_at: string | null;
+  outcome: string | null;
+  sla_target_minutes: number;
+  elapsed_minutes: number | null;
+};
+
+export async function getSteps(orderId: string | number): Promise<WorkflowStep[]> {
+  const res = await fetch(`${API}/orders/${orderId}/steps`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`GET /orders/${orderId}/steps -> ${res.status}`);
+  return res.json();
+}
+
+export async function confirmOrder(orderId: number): Promise<void> {
+  const res = await fetch(`${API}/orders/${orderId}/confirm`, { method: "POST" });
+  if (!res.ok) throw new Error((await res.text()) || `confirm -> ${res.status}`);
+}
+
+export async function completeStep(stepId: number, outcome: string): Promise<void> {
+  const res = await fetch(`${API}/workflow-steps/${stepId}/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ outcome }),
+  });
+  if (!res.ok) throw new Error((await res.text()) || `complete -> ${res.status}`);
+}
