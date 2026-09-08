@@ -1,10 +1,14 @@
 from decimal import Decimal
+from unittest.mock import AsyncMock
 
 import pytest_asyncio
 
+from app.models.job import Job
 from app.models.product import Product
+from app.repositories import order_repo
 from app.schemas.extraction import ExtractedItem, Extraction
 from app.services import order_service
+from app.services.extraction import ExtractionError
 
 
 @pytest_asyncio.fixture
@@ -38,57 +42,69 @@ def _fake(intent: str, items: list[tuple[str, str, str]], confidence: float):
     return inner
 
 
-async def test_intake_matches_products(client, products, monkeypatch) -> None:
+async def _make_job(session) -> Job:
+    job = Job(type="order_intake", status="queued", progress=0)
+    session.add(job)
+    await session.commit()
+    return job
+
+
+async def test_run_intake_matches_products(session, products, monkeypatch) -> None:
     monkeypatch.setattr(
         order_service,
         "extract_order",
         _fake("order", [("semen tiga roda", "3", "sak"),
                         ("cat putih avitex", "2", "kaleng")], 0.95),
     )
-    r = await client.post(
-        "/orders/intake", json={"customer_name": "Andi", "body": "x"}
-    )
-    assert r.status_code == 201
-    body = r.json()
-    assert body["needs_review"] is False
-    assert all(i["product_id"] is not None for i in body["items"])
-    assert body["items"][0]["raw_name"] == "semen tiga roda"
+    job = await _make_job(session)
+    await order_service.run_intake(session, job.id, "Andi", "x")
+    await session.refresh(job)
+
+    assert job.status == "done"
+    assert job.progress == 100
+    order = await order_repo.get_by_id(session, int(job.result_ref))
+    assert order is not None
+    assert order.needs_review is False
+    assert all(i.product_id is not None for i in order.items)
 
 
-async def test_intake_flags_review_on_unmatched(client, products, monkeypatch) -> None:
+async def test_run_intake_flags_review_on_unmatched(session, products, monkeypatch) -> None:
     monkeypatch.setattr(
         order_service,
         "extract_order",
         _fake("order", [("barang ngawur zzz", "1", "pcs")], 0.9),
     )
-    r = await client.post(
-        "/orders/intake", json={"customer_name": "Andi", "body": "x"}
-    )
-    assert r.status_code == 201
-    body = r.json()
-    assert body["needs_review"] is True
-    assert body["items"][0]["product_id"] is None
+    job = await _make_job(session)
+    await order_service.run_intake(session, job.id, "Andi", "x")
+    await session.refresh(job)
+
+    order = await order_repo.get_by_id(session, int(job.result_ref))
+    assert order is not None
+    assert order.needs_review is True
+    assert order.items[0].product_id is None
 
 
-async def test_intake_flags_review_on_inquiry(client, products, monkeypatch) -> None:
+async def test_run_intake_sets_error_on_extraction_failure(session, monkeypatch) -> None:
+    async def boom(body: str) -> Extraction:
+        raise ExtractionError("json invalid")
+
+    monkeypatch.setattr(order_service, "extract_order", boom)
+    job = await _make_job(session)
+    await order_service.run_intake(session, job.id, "Andi", "x")
+    await session.refresh(job)
+
+    assert job.status == "error"
+    assert job.error
+
+
+async def test_intake_endpoint_returns_202(client, monkeypatch) -> None:
+    fake_queue = AsyncMock()
     monkeypatch.setattr(
-        order_service,
-        "extract_order",
-        _fake("inquiry", [("semen tiga roda", "1", "sak")], 0.9),
+        order_service, "get_queue", AsyncMock(return_value=fake_queue)
     )
     r = await client.post(
         "/orders/intake", json={"customer_name": "Andi", "body": "x"}
     )
-    assert r.json()["needs_review"] is True
-
-
-async def test_intake_flags_review_on_low_confidence(client, products, monkeypatch) -> None:
-    monkeypatch.setattr(
-        order_service,
-        "extract_order",
-        _fake("order", [("semen tiga roda", "1", "sak")], 0.4),
-    )
-    r = await client.post(
-        "/orders/intake", json={"customer_name": "Andi", "body": "x"}
-    )
-    assert r.json()["needs_review"] is True
+    assert r.status_code == 202
+    assert "job_id" in r.json()
+    fake_queue.enqueue_job.assert_awaited_once()

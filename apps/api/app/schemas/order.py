@@ -19,6 +19,10 @@ class OrderIntakeRequest(BaseModel):
     body: str = Field(min_length=1)
 
 
+class OrderIntakeResponse(BaseModel):
+    job_id: str
+
+
 class OrderItemRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

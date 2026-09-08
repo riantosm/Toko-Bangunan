@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.schemas.order import (
     OrderCreate,
     OrderIntakeRequest,
+    OrderIntakeResponse,
     OrderListResponse,
     OrderRead,
 )
@@ -21,14 +22,21 @@ async def create_order(
     return OrderRead.model_validate(order)
 
 
-@router.post("/intake", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/intake",
+    response_model=OrderIntakeResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def intake_order(
-    payload: OrderIntakeRequest, session: AsyncSession = Depends(get_session)
-) -> OrderRead:
-    order = await order_service.intake_order(
+    payload: OrderIntakeRequest,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+) -> OrderIntakeResponse:
+    job = await order_service.enqueue_intake(
         session, payload.customer_name, payload.body
     )
-    return OrderRead.model_validate(order)
+    response.headers["Location"] = f"/jobs/{job.id}"
+    return OrderIntakeResponse(job_id=job.id)
 
 
 @router.get("", response_model=OrderListResponse)
