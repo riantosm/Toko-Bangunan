@@ -8,6 +8,8 @@ class Settings(BaseSettings):
 
     database_url: str
     app_env: str = "development"
+    ollama_url: str = "http://localhost:11434"
+    ollama_model: str = "gemma3:4b"
 
 
 settings = Settings()  # type: ignore[call-arg]

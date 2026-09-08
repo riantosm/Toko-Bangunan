@@ -17,6 +17,7 @@ TestSession = async_sessionmaker(engine, expire_on_commit=False)
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _create_schema() -> AsyncGenerator[None, None]:
     async with engine.begin() as conn:
+        await conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS pg_trgm")
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield
