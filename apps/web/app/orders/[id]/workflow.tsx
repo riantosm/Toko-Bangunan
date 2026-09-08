@@ -36,7 +36,7 @@ export function OrderWorkflow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, status]);
 
-  async function run(fn: () => Promise<void>) {
+  async function run(fn: () => Promise<unknown>) {
     setBusy(true);
     setError(null);
     try {

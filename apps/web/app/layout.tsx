@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+import { UserMenu } from "./components/user-menu";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -28,17 +30,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <header className="border-b border-hair">
           <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-5 py-3">
-            <Link href="/" className="text-sm font-semibold tracking-tight text-ink">
-              Toko&nbsp;Bangunan
-            </Link>
-            <nav className="flex gap-5 text-sm text-ink-3">
-              <Link href="/orders" className="transition-colors hover:text-ink">
-                Order
+            <div className="flex items-center gap-5">
+              <Link href="/" className="text-sm font-semibold tracking-tight text-ink">
+                Toko&nbsp;Bangunan
               </Link>
-              <Link href="/dashboard" className="transition-colors hover:text-ink">
-                Dashboard
-              </Link>
-            </nav>
+              <nav className="flex gap-5 text-sm text-ink-3">
+                <Link href="/orders" className="transition-colors hover:text-ink">
+                  Order
+                </Link>
+                <Link href="/dashboard" className="transition-colors hover:text-ink">
+                  Dashboard
+                </Link>
+              </nav>
+            </div>
+            <UserMenu />
           </div>
         </header>
         {children}

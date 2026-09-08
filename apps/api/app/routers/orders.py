@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
+from app.core.deps import get_current_user
 from app.schemas.order import (
     OrderCreate,
     OrderIntakeRequest,
@@ -11,7 +12,11 @@ from app.schemas.order import (
 )
 from app.services import order_service
 
-router = APIRouter(prefix="/orders", tags=["orders"])
+router = APIRouter(
+    prefix="/orders",
+    tags=["orders"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.post("", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
