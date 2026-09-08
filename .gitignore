@@ -1,0 +1,27 @@
+# deps
+node_modules/
+.venv/
+.pnp.*
+
+# build / cache
+.next/
+out/
+dist/
+build/
+.turbo/
+coverage/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# os / editor
+.DS_Store
+.idea/
+*.log
