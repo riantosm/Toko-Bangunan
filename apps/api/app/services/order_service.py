@@ -2,12 +2,15 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.job import Job
+from app.models.processed_request import ProcessedRequest
 from app.models.order import Order, OrderItem
 from app.models.product import Product
 from app.repositories import order_repo
 from app.schemas.order import OrderCreate, OrderListResponse, OrderListRow
 from app.services.extraction import ExtractionError, extract_order
 from app.services.matching import match_product
+from app.workers.queue import get_queue
 
 CONFIDENCE_THRESHOLD = 0.6
 
@@ -41,16 +44,57 @@ async def create_order(session: AsyncSession, payload: OrderCreate) -> Order:
     return created
 
 
-async def intake_order(
-    session: AsyncSession, customer_name: str, body: str
-) -> Order:
+async def enqueue_intake(
+    session: AsyncSession,
+    customer_name: str,
+    body: str,
+    idempotency_key: str | None = None,
+) -> Job:
+    if idempotency_key:
+        seen = await session.get(ProcessedRequest, idempotency_key)
+        if seen is not None:
+            existing = await session.get(Job, seen.response["job_id"])
+            if existing is not None:
+                return existing
+
+    job = Job(type="order_intake", status="queued", progress=0)
+    session.add(job)
+    await session.flush()
+
+    if idempotency_key:
+        session.add(
+            ProcessedRequest(key=idempotency_key, response={"job_id": job.id})
+        )
+
+    await session.commit()
+
+    queue = await get_queue()
+    await queue.enqueue_job("process_intake_job", job.id, customer_name, body)
+    return job
+
+
+async def run_intake(
+    session: AsyncSession, job_id: str, customer_name: str, body: str
+) -> None:
+    job = await session.get(Job, job_id)
+    if job is None:
+        return
+
+    job.status = "processing"
+    job.progress = 10
+    await session.commit()
+
     try:
         extraction = await extract_order(body)
     except ExtractionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"AI gagal memproses pesan: {exc}",
-        ) from exc
+        job.status = "error"
+        job.error = f"AI gagal memproses pesan: {exc}"[:500]
+        job.progress = 100
+        await session.commit()
+        return
+
+    job.progress = 50
+    await session.commit()
 
     order = Order(
         customer_name=customer_name,
@@ -81,9 +125,10 @@ async def intake_order(
     session.add(order)
     await session.commit()
 
-    created = await order_repo.get_by_id(session, order.id)
-    assert created is not None
-    return created
+    job.status = "done"
+    job.result_ref = str(order.id)
+    job.progress = 100
+    await session.commit()
 
 
 async def get_order(session: AsyncSession, order_id: int) -> Order:

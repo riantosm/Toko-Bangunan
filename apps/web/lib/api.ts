@@ -19,6 +19,14 @@ export type Order = {
   intent: string | null; extraction_confidence: number | null; needs_review: boolean;
   created_at: string; items: OrderItem[];
 };
+export type Job = {
+  id: string;
+  type: string;
+  status: "queued" | "processing" | "done" | "error";
+  progress: number;
+  result_ref: string | null;
+  error: string | null;
+};
 
 export async function getOrders(): Promise<OrderList> {
   const res = await fetch(`${API}/orders`, { cache: "no-store" });
@@ -55,14 +63,23 @@ export async function createOrder(payload: {
 export async function intakeOrder(payload: {
   customer_name: string;
   body: string;
-}): Promise<Order> {
+}): Promise<{ job_id: string }> {
   const res = await fetch(`${API}/orders/intake`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": crypto.randomUUID(),
+    },
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
     throw new Error((await res.text()) || `POST /orders/intake -> ${res.status}`);
   }
+  return res.json();
+}
+
+export async function getJob(id: string): Promise<Job> {
+  const res = await fetch(`${API}/jobs/${id}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`GET /jobs/${id} -> ${res.status}`);
   return res.json();
 }
