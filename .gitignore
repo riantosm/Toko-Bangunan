@@ -25,3 +25,12 @@ __pycache__/
 .DS_Store
 .idea/
 *.log
+
+# private prep docs — kept locally, not on GitHub
+/Prescreening-Answers.docx
+/LEARNING-PATH.md
+/PROJECT-GUIDE.md
+/STACK.md
+/fullstack_developer_prescreening SEPT 2026.pdf
+/WHATSAPP-PLAN.md
+/INTERVIEW-PREP.md
