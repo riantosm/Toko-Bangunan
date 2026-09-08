@@ -1,24 +1,14 @@
 [project]
 name = "api"
 version = "0.1.0"
-description = "Add your description here"
+description = "Toko Bangunan API"
 readme = "README.md"
-authors = [
-    { name = "Rian Tosm", email = "rian.tosm@gmail.com" }
-]
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.141.1",
     "pydantic-settings>=2.15.0",
     "uvicorn[standard]>=0.52.4",
 ]
-
-[project.scripts]
-api = "api:main"
-
-[build-system]
-requires = ["uv_build>=0.12.10,<0.13.0"]
-build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
@@ -28,3 +18,10 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "ruff>=0.16.6",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
