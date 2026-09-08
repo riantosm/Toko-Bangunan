@@ -115,3 +115,42 @@ export async function completeStep(stepId: number, outcome: string): Promise<voi
   });
   if (!res.ok) throw new Error((await res.text()) || `complete -> ${res.status}`);
 }
+
+// ---- metrics ----
+
+export type MetricsSummary = {
+  orders_total: number;
+  orders_done: number;
+  wip: number;
+  sla_met_pct: number | null;
+};
+export type StepDuration = {
+  step_type: string;
+  n: number;
+  avg_minutes: string;
+  p50: string;
+  p90: string;
+  breached: number;
+};
+export type DailyPoint = { day: string; steps_done: number; sla_met_pct: string };
+export type AgingRow = {
+  order_id: number;
+  customer_name: string;
+  current_step: string;
+  waiting_minutes: string;
+  sla_target_minutes: number;
+};
+
+async function metricsFetch<T>(path: string): Promise<T> {
+  const res = await fetch(`${API}/metrics/${path}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`GET /metrics/${path} -> ${res.status}`);
+  return res.json();
+}
+
+export const getSummary = (days: number) =>
+  metricsFetch<MetricsSummary>(`summary?days=${days}`);
+export const getStepDurations = (days: number) =>
+  metricsFetch<StepDuration[]>(`step-durations?days=${days}`);
+export const getDaily = (days: number) =>
+  metricsFetch<DailyPoint[]>(`daily?days=${days}`);
+export const getAging = () => metricsFetch<AgingRow[]>("aging");

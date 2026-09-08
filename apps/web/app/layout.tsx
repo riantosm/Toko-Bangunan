@@ -35,6 +35,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/orders" className="transition-colors hover:text-ink">
                 Order
               </Link>
+              <Link href="/dashboard" className="transition-colors hover:text-ink">
+                Dashboard
+              </Link>
             </nav>
           </div>
         </header>
