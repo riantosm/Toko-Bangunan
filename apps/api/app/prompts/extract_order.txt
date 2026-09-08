@@ -8,6 +8,8 @@ Aturan:
 - unit HARUS salah satu satuan baku: sak, kaleng, kg, batang, lembar, m3, biji, roll, dus.
   Petakan sinonim: karung -> sak; meter kubik -> m3; galon -> kaleng.
 - quantity: angka. Ubah kata bilangan ("tiga" -> 3, "setengah" -> 0.5). Jika tidak disebut, pakai 1.
+- Jangan pernah menuliskan "..." atau placeholder. Jika unit tidak jelas, tebak satuan paling umum untuk barang itu.
+- Jangan pernah menuliskan "..." atau placeholder. Jika unit tidak jelas, tebak satuan paling umum untuk barang itu.
 - name: nama barang inti tanpa angka & satuan (contoh: "semen tiga roda", "cat tembok putih").
 - confidence: 0..1, seberapa yakin kamu pada hasil ekstraksi keseluruhan.
 - notes: catatan singkat kalau ada yang ambigu; boleh string kosong.
