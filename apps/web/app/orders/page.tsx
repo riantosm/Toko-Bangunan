@@ -1,6 +1,14 @@
-import Link from "next/link";
-
+import {
+  ButtonLink,
+  EmptyRow,
+  PageHeader,
+  PageShell,
+  Table,
+  Th,
+} from "@/app/components/ui";
 import { getOrders } from "@/lib/api";
+
+import { OrderRow } from "./order-row";
 
 export const dynamic = "force-dynamic";
 
@@ -8,50 +16,43 @@ export default async function OrdersPage() {
   const data = await getOrders();
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Order ({data.total})</h1>
-        <Link
-          href="/orders/new"
-          className="rounded bg-black px-3 py-1.5 text-sm text-white"
-        >
-          + Buat Order
-        </Link>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Daftar"
+        title={`Order (${data.total})`}
+        action={
+          <div className="flex gap-2">
+            <ButtonLink href="/orders/intake" variant="primary">
+              Intake AI
+            </ButtonLink>
+            <ButtonLink href="/orders/new">+ Manual</ButtonLink>
+          </div>
+        }
+      />
 
-      <table className="w-full border-collapse text-sm">
+      <Table>
         <thead>
-          <tr className="border-b text-left text-gray-500">
-            <th className="py-2">ID</th>
-            <th>Pelanggan</th>
-            <th>Status</th>
-            <th>Item</th>
-            <th>Dibuat</th>
+          <tr>
+            <Th>ID</Th>
+            <Th>Pelanggan</Th>
+            <Th>Status</Th>
+            <Th>Item</Th>
+            <Th>Dibuat</Th>
           </tr>
         </thead>
         <tbody>
           {data.items.map((o) => (
-            <tr key={o.id} className="border-b">
-              <td className="py-2">
-                <Link href={`/orders/${o.id}`} className="text-blue-600 underline">
-                  {o.id}
-                </Link>
-              </td>
-              <td>{o.customer_name}</td>
-              <td>{o.status}</td>
-              <td>{o.item_count}</td>
-              <td>{new Date(o.created_at).toLocaleString("id-ID")}</td>
-            </tr>
+            <OrderRow
+              key={o.id}
+              order={o}
+              createdLabel={new Date(o.created_at).toLocaleString("id-ID")}
+            />
           ))}
-          {data.items.length === 0 && (
-            <tr>
-              <td colSpan={5} className="py-6 text-center text-gray-400">
-                Belum ada order
-              </td>
-            </tr>
-          )}
+          {data.items.length === 0 ? (
+            <EmptyRow colSpan={5}>Belum ada order</EmptyRow>
+          ) : null}
         </tbody>
-      </table>
-    </main>
+      </Table>
+    </PageShell>
   );
 }

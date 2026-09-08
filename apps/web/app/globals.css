@@ -1,26 +1,68 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+  Design tokens — light theme, adapted from DESIGN_SYSTEM.md.
+  DS ships a dark "frosted glass at midnight" marketing look; this app is an
+  internal tool (tables + forms) so we run it light. The DS *language* is kept:
+  soft off-white ground, frosted white surfaces, hairline (never solid) borders,
+  one violet accent, a cool blue-grey ink hierarchy, a faint blueprint grid.
+*/
+@theme {
+  --color-canvas: #f6f7f9; /* page background — soft, not pure white */
+  --color-surface: #ffffff; /* cards / elevated panels */
+  --color-surface-2: #f0f2f5; /* inputs, nested fills */
+
+  --color-hair: rgba(17, 24, 39, 0.1); /* universal hairline border */
+  --color-hair-2: rgba(17, 24, 39, 0.22); /* focus / hover hairline */
+
+  --color-ink: #171b26; /* headings */
+  --color-ink-2: #3b414f; /* body text, links */
+  --color-ink-3: #6b7280; /* muted body */
+  --color-ink-4: #99a1b0; /* helper / eyebrow */
+
+  --color-accent: #6238f0; /* the single chromatic accent — primary actions only */
+  --color-accent-ink: #ffffff;
+
+  --color-warn: #b26a10; /* status: needs review */
+  --color-warn-soft: rgba(178, 106, 16, 0.12);
+  --color-bad: #c0392b; /* status: error / unknown */
+  --color-bad-soft: rgba(192, 57, 43, 0.1);
+  --color-good: #0f7b6c; /* status: ok */
+  --color-good-soft: rgba(15, 123, 108, 0.1);
+
+  --radius-card: 16px;
+  --radius-input: 8px;
+  --radius-pill: 999px;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-canvas);
+  color: var(--color-ink-2);
+  font-family: var(--font-sans);
+  /* faint blueprint grid — ambient, low opacity */
+  background-image:
+    linear-gradient(rgba(17, 24, 39, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 24, 39, 0.025) 1px, transparent 1px);
+  background-size: 88px 88px;
+}
+
+::selection {
+  background: rgba(98, 56, 240, 0.18);
+}
+
+/* styled native <select>: hide OS chevron, draw our own */
+.select-field {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.625rem center;
+  background-size: 1rem;
+  padding-right: 2.25rem;
 }
