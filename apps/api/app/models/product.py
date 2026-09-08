@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Numeric, String, func
+from sqlalchemy import DateTime, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -16,4 +16,6 @@ class Product(Base):
     unit: Mapped[str] = mapped_column(String(20))
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"))
     stock_qty: Mapped[int] = mapped_column(default=0)
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
