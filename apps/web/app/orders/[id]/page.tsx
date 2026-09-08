@@ -11,6 +11,8 @@ import {
 } from "@/app/components/ui";
 import { getOrder } from "@/lib/api";
 
+import { OrderWorkflow } from "./workflow";
+
 export const dynamic = "force-dynamic";
 
 export default async function OrderDetailPage({
@@ -81,6 +83,8 @@ export default async function OrderDetailPage({
           ))}
         </tbody>
       </Table>
+
+      <OrderWorkflow orderId={order.id} status={order.status} />
     </PageShell>
   );
 }

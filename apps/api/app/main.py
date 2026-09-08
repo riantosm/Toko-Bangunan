@@ -4,7 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
-from app.routers import jobs, orders, products
+from app.routers import jobs, orders, products, workflow, workflow
 
 app = FastAPI(title="Toko Bangunan API")
 
@@ -18,6 +18,8 @@ app.add_middleware(
 app.include_router(orders.router)
 app.include_router(products.router)
 app.include_router(jobs.router)
+app.include_router(workflow.router)
+app.include_router(workflow.router)
 
 
 @app.get("/health")
