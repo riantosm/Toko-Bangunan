@@ -1,6 +1,14 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import {
+  BackLink,
+  Badge,
+  Card,
+  PageShell,
+  Table,
+  Td,
+  Th,
+} from "@/app/components/ui";
 import { getOrder } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -15,34 +23,73 @@ export default async function OrderDetailPage({
   if (!order) notFound();
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <Link href="/orders" className="text-sm text-blue-600 underline">
-        &larr; kembali
-      </Link>
-      <h1 className="mt-2 text-xl font-semibold">Order #{order.id}</h1>
-      <p className="text-gray-600">
-        {order.customer_name} &middot; {order.status} &middot;{" "}
-        {new Date(order.created_at).toLocaleString("id-ID")}
-      </p>
+    <PageShell>
+      <BackLink href="/orders" />
 
-      <table className="mt-4 w-full border-collapse text-sm">
+      <div className="mb-6 flex items-center gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
+          Order #{order.id}
+        </h1>
+        {order.needs_review ? <Badge tone="warn">perlu review</Badge> : null}
+      </div>
+
+      <Card className="mb-6 grid gap-3 p-5 sm:grid-cols-3">
+        <Meta label="Pelanggan" value={order.customer_name} />
+        <Meta label="Status" value={order.status} />
+        <Meta
+          label="Dibuat"
+          value={new Date(order.created_at).toLocaleString("id-ID")}
+        />
+        {order.intent ? (
+          <Meta label="Intent (AI)" value={order.intent} />
+        ) : null}
+        {order.extraction_confidence != null ? (
+          <Meta
+            label="Confidence (AI)"
+            value={`${Math.round(order.extraction_confidence * 100)}%`}
+          />
+        ) : null}
+      </Card>
+
+      <Table>
         <thead>
-          <tr className="border-b text-left text-gray-500">
-            <th className="py-2">Produk (ID)</th>
-            <th>Jumlah</th>
-            <th>Satuan</th>
+          <tr>
+            <Th>Produk</Th>
+            <Th>Teks asli</Th>
+            <Th>Jumlah</Th>
+            <Th>Satuan</Th>
+            <Th>Skor</Th>
           </tr>
         </thead>
         <tbody>
           {order.items.map((it) => (
-            <tr key={it.id} className="border-b">
-              <td className="py-2">{it.product_id}</td>
-              <td>{it.quantity}</td>
-              <td>{it.unit}</td>
+            <tr key={it.id}>
+              <Td>
+                {it.product_id != null ? (
+                  `#${it.product_id}`
+                ) : (
+                  <Badge tone="bad">tak dikenal</Badge>
+                )}
+              </Td>
+              <Td className="text-ink-3">{it.raw_name ?? "—"}</Td>
+              <Td>{it.quantity}</Td>
+              <Td>{it.unit}</Td>
+              <Td className="text-ink-3">
+                {it.matched_score != null ? it.matched_score.toFixed(2) : "—"}
+              </Td>
             </tr>
           ))}
         </tbody>
-      </table>
-    </main>
+      </Table>
+    </PageShell>
+  );
+}
+
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-wide text-ink-4">{label}</p>
+      <p className="mt-0.5 text-ink">{value}</p>
+    </div>
   );
 }

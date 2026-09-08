@@ -4,16 +4,20 @@ export type Product = {
   id: number; sku: string; name: string; unit: string; price: string; stock_qty: number;
 };
 export type OrderListRow = {
-  id: number; customer_name: string; status: string; created_at: string; item_count: number;
+  id: number; customer_name: string; status: string; needs_review: boolean;
+  item_count: number; created_at: string;
 };
 export type OrderList = {
   items: OrderListRow[]; total: number; page: number; size: number;
 };
 export type OrderItem = {
-  id: number; product_id: number; quantity: string; unit: string;
+  id: number; product_id: number | null; raw_name: string | null;
+  quantity: string; unit: string; matched_score: number | null;
 };
 export type Order = {
-  id: number; customer_name: string; status: string; created_at: string; items: OrderItem[];
+  id: number; customer_name: string; status: string;
+  intent: string | null; extraction_confidence: number | null; needs_review: boolean;
+  created_at: string; items: OrderItem[];
 };
 
 export async function getOrders(): Promise<OrderList> {
@@ -35,15 +39,30 @@ export async function getProducts(): Promise<Product[]> {
   return res.json();
 }
 
-export async function createOrder(body: {
+export async function createOrder(payload: {
   customer_name: string;
   items: { product_id: number; quantity: number }[];
 }): Promise<Order> {
   const res = await fetch(`${API}/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error((await res.text()) || `POST /orders -> ${res.status}`);
+  return res.json();
+}
+
+export async function intakeOrder(payload: {
+  customer_name: string;
+  body: string;
+}): Promise<Order> {
+  const res = await fetch(`${API}/orders/intake`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `POST /orders/intake -> ${res.status}`);
+  }
   return res.json();
 }
