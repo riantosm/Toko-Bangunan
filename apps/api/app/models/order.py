@@ -6,6 +6,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
 
+if False:  # type-checking only
+    from app.models.product import Product
+
 
 class Order(Base):
     __tablename__ = "orders"
@@ -33,3 +36,4 @@ class OrderItem(Base):
     unit: Mapped[str] = mapped_column(String(20))
 
     order: Mapped["Order"] = relationship(back_populates="items")
+    product: Mapped["Product"] = relationship()

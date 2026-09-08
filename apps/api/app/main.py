@@ -3,8 +3,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
+from app.routers import orders
 
 app = FastAPI(title="Toko Bangunan API")
+app.include_router(orders.router)
 
 
 @app.get("/health")
