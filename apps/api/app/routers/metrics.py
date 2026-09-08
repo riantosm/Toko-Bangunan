@@ -1,12 +1,18 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
+
+from app.core.deps import require_role
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.services import metrics_service
 
-router = APIRouter(prefix="/metrics", tags=["metrics"])
+router = APIRouter(
+    prefix="/metrics",
+    tags=["metrics"],
+    dependencies=[Depends(require_role("manager", "admin"))],
+)
 
 Days = Query(30, ge=1, le=365)
 

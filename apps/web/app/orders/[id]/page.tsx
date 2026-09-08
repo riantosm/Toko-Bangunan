@@ -10,6 +10,7 @@ import {
   Th,
 } from "@/app/components/ui";
 import { getOrder } from "@/lib/api";
+import { requireToken } from "@/lib/guard";
 
 import { OrderWorkflow } from "./workflow";
 
@@ -21,7 +22,8 @@ export default async function OrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const order = await getOrder(id);
+  const token = await requireToken();
+  const order = await getOrder(id, token);
   if (!order) notFound();
 
   return (

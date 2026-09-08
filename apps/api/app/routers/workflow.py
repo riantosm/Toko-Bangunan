@@ -2,10 +2,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
+from app.core.deps import get_current_user
 from app.schemas.workflow import CompleteStepRequest, WorkflowStepRead
 from app.services import workflow_service
 
-router = APIRouter(tags=["workflow"])
+router = APIRouter(
+    tags=["workflow"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.post("/orders/{order_id}/confirm")

@@ -14,6 +14,7 @@ import {
   getStepDurations,
   getSummary,
 } from "@/lib/api";
+import { requireRole } from "@/lib/guard";
 
 import { SlaTrendChart, StepDurationChart } from "./charts";
 
@@ -26,14 +27,15 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ days?: string }>;
 }) {
+  const token = await requireRole("manager", "admin");
   const { days: daysParam } = await searchParams;
   const days = PRESETS.includes(Number(daysParam)) ? Number(daysParam) : 30;
 
   const [summary, steps, daily, aging] = await Promise.all([
-    getSummary(days),
-    getStepDurations(days),
-    getDaily(days),
-    getAging(),
+    getSummary(days, token),
+    getStepDurations(days, token),
+    getDaily(days, token),
+    getAging(token),
   ]);
 
   return (

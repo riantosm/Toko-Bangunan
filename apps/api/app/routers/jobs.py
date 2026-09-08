@@ -2,10 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
+from app.core.deps import get_current_user
 from app.models.job import Job
 from app.schemas.job import JobRead
 
-router = APIRouter(prefix="/jobs", tags=["jobs"])
+router = APIRouter(
+    prefix="/jobs",
+    tags=["jobs"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.get("/{job_id}", response_model=JobRead)

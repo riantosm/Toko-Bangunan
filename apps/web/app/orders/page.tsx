@@ -7,13 +7,15 @@ import {
   Th,
 } from "@/app/components/ui";
 import { getOrders } from "@/lib/api";
+import { requireToken } from "@/lib/guard";
 
 import { OrderRow } from "./order-row";
 
 export const dynamic = "force-dynamic";
 
 export default async function OrdersPage() {
-  const data = await getOrders();
+  const token = await requireToken();
+  const data = await getOrders(token);
 
   return (
     <PageShell>

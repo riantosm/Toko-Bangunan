@@ -32,8 +32,8 @@ async def test_login_wrong_password(client, users) -> None:
     assert r.status_code == 401
 
 
-async def test_me_requires_token(client) -> None:
-    r = await client.get("/auth/me")
+async def test_me_requires_token(anon_client) -> None:
+    r = await anon_client.get("/auth/me")
     assert r.status_code == 401
 
 

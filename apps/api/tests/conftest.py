@@ -7,7 +7,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import settings
 from app.core.db import Base, get_session
+from app.core.security import create_access_token, hash_password
 from app.main import app
+from app.models.user import User
 
 TEST_DB_URL = settings.database_url.rsplit("/", 1)[0] + "/tokobangunan_test"
 engine = create_async_engine(TEST_DB_URL)
@@ -28,7 +30,9 @@ async def _create_schema() -> AsyncGenerator[None, None]:
 async def _clean_tables() -> AsyncGenerator[None, None]:
     async with engine.begin() as conn:
         for tbl in reversed(Base.metadata.sorted_tables):
-            await conn.execute(text(f'TRUNCATE "{tbl.name}" RESTART IDENTITY CASCADE'))
+            await conn.execute(
+                text(f'TRUNCATE "{tbl.name}" RESTART IDENTITY CASCADE')
+            )
     yield
 
 
@@ -39,7 +43,7 @@ async def session() -> AsyncGenerator:
 
 
 @pytest_asyncio.fixture
-async def client(session) -> AsyncGenerator[AsyncClient, None]:
+async def anon_client(session) -> AsyncGenerator[AsyncClient, None]:
     async def _override() -> AsyncGenerator:
         yield session
 
@@ -49,3 +53,24 @@ async def client(session) -> AsyncGenerator[AsyncClient, None]:
     ) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def manager_user(session) -> User:
+    user = User(
+        name="Test Mgr",
+        email="testmgr@local.test",
+        password_hash=hash_password("x"),
+        role="manager",
+    )
+    session.add(user)
+    await session.commit()
+    return user
+
+
+@pytest_asyncio.fixture
+async def client(anon_client, manager_user) -> AsyncClient:
+    """Client sudah login sebagai manager — bisa akses semua endpoint."""
+    token = create_access_token(user_id=manager_user.id, role=manager_user.role)
+    anon_client.headers["Authorization"] = f"Bearer {token}"
+    return anon_client
