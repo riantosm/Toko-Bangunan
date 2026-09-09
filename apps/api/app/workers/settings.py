@@ -3,9 +3,9 @@ from typing import ClassVar
 from arq.connections import RedisSettings
 
 from app.core.config import settings
-from app.workers.tasks import ping, process_intake_job
+from app.workers.tasks import ping, process_intake_job, process_wa_message
 
 
 class WorkerSettings:
-    functions: ClassVar = [ping, process_intake_job]
+    functions: ClassVar = [ping, process_intake_job, process_wa_message]
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
