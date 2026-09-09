@@ -25,7 +25,7 @@ pencatatan durasi, dan manajemen memantau **dashboard SLA**.
 | 8 | Kanal WhatsApp — webhook + HMAC, auto-reply, state percakapan, simulator; departments/workflow_types | ✅ |
 | 9 | Laporan harian terjadwal (APScheduler → PDF → email) + abstraksi `TaskQueue` | ✅ |
 | 10 | PostgreSQL performance lab — `EXPLAIN (ANALYZE, BUFFERS)`, index, CTE/window; keyset pagination | ✅ |
-| 11 | CI (GitHub Actions — lint + test) | ⬜ |
+| 11 | CI (GitHub Actions — 2 job: api ruff/mypy/pytest, web typecheck/lint/vitest/build) | ✅ |
 | 12 | Evaluasi akurasi AI (gold set, metrik F1) | ⬜ |
 | 13 | Deploy cloud (Vercel + Cloud Run) + WhatsApp Cloud API + Cloud Tasks | ⬜ |
 
@@ -119,6 +119,14 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 - **4 optimasi terbukti dengan angka**: composite index (equality→range, ~150×), partial index (index 27× lebih kecil), covering index `INCLUDE` → Index Only Scan (~9×), keyset vs `OFFSET 500k` (~2000×). Plus 1 query analitik **CTE + `RANK() OVER (PARTITION BY month)`** ("3 pelanggan teratas per bulan").
 - **Diterapkan ke app** — `GET /orders` pindah dari `page/offset` ke **keyset** (`?limit=&after=<id>`): balas `{ items, next_cursor }`, PostgreSQL *seek* langsung lewat `orders_pkey` (tanpa `OFFSET`), biaya rata berapa pun dalamnya halaman. Frontend punya tombol "Muat lebih banyak →".
 
+### 11. CI (GitHub Actions)
+- **`.github/workflows/ci.yml`** — jalan tiap `push` ke `main` & tiap PR, 2 job paralel:
+  - **api** — `services.postgres:16`, `uv sync`, buat DB `tokobangunan_test`, lalu `ruff check` + `mypy` + `pytest`.
+  - **web** — `pnpm install --frozen-lockfile`, lalu `tsc --noEmit` + `eslint` + `vitest run` + `next build`.
+- **`mypy`** dikonfigurasi (`[tool.mypy]`, override `ignore_missing_imports` untuk `reportlab`/`apscheduler`) — sekarang benar-benar hijau.
+- **Vitest** ditambahkan di `apps/web` — unit test murni (`lib/orders.test.ts`: `parseCursor` untuk cursor keyset).
+- Branch protection ("wajib 2 check hijau + 1 review sebelum merge") diaktifkan di Settings repo GitHub.
+
 ### Fondasi lintas fitur
 - **Desain sistem** (`apps/web/app/globals.css` + `apps/web/app/components/ui.tsx`): tema **light**, token Tailwind v4 `@theme`, hairline border, satu aksen violet, primitif bersama (`Card`, `Button`, `Badge`, `Table`, `Field`, …).
 - **Migrasi** semua lewat Alembic (autogenerate + edit manual untuk `pg_trgm` & generated column).
@@ -200,11 +208,11 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 | Observability | **structured logging JSON** + `requestId` (contextvar → `X-Request-Id`) · Sentry *(rencana)* | Korelasi log ↔ response |
 | Kanal WhatsApp | **WhatsApp Cloud API** (Meta) shape + webhook **HMAC-SHA256** di Next.js route handler; dev pakai `/simulator` | Chat pelanggan → order otomatis |
 | Testing BE | **pytest** + **pytest-asyncio** + **httpx** (`ASGITransport`) — coverage *(rencana)* | Test API & unit tanpa menyalakan server |
-| Testing FE | **tsc --noEmit** + **ESLint** — Vitest / Playwright *(rencana, Fase 11)* | Type-check + unit/E2E |
+| Testing FE | **tsc --noEmit** + **ESLint** + **Vitest** (unit) — Playwright *(rencana)* | Type-check + unit/E2E |
 | Kualitas kode | **Ruff** + **mypy** (BE) · **ESLint** + **TypeScript strict** (FE) | Lint & type-check |
 | Kontainer | **Docker Compose** (Postgres, Redis) | Infrastruktur dev reproducible |
 | Version control | **Git** + **GitHub** — *Conventional Commits* | Riwayat rapi, commit kecil |
-| CI/CD | **GitHub Actions** *(rencana, Fase 11)* | Lint → test tiap PR |
+| CI/CD | **GitHub Actions** — 2 job (api: ruff/mypy/pytest + Postgres service · web: tsc/eslint/vitest/build) | Lint → type-check → test tiap PR |
 | Cloud | **Vercel** (web) + **Cloud Run** (api) + **Cloud SQL** + **Cloud Tasks / Scheduler** *(rencana, Fase 13 — `CloudTasksQueue` sudah disketsakan)* | Sesuai target produksi; demo jalan lokal |
 | AI coding assistant | **Claude Code** | Scaffolding, test, review |
 | Package manager | **uv** (Python) · **pnpm** (JS) | Cepat, lockfile deterministik |
@@ -269,6 +277,7 @@ nextjs_python/
 │       ├── db_lab/                   # perf lab: seed 1M rows, queries.sql, NOTES.md
 │       ├── scripts/                  # seed_* + try_* (eksplorasi)
 │       └── tests/
+├── .github/workflows/ci.yml          # 2 job: api (ruff/mypy/pytest) · web (tsc/eslint/vitest/build)
 ├── docker-compose.yml                # db + redis + mailpit
 └── README.md
 ```
@@ -373,12 +382,14 @@ Laporan harian: `SCHEDULER_ENABLED=true` di `.env` mengaktifkan cron 22:00; atau
 ## Testing
 
 ```bash
-cd apps/api && uv run pytest -q
+cd apps/api && uv run pytest -q          # backend
+cd apps/web && pnpm test                 # frontend (vitest)
 ```
 
-- **38 test**: `test_orders` (termasuk keyset pagination), `test_intake`, `test_workflow`, `test_metrics`, `test_auth`, `test_ratelimit`, `test_internal`, `test_conversation`, `test_reports` (idempotensi laporan + PDF), `test_taskqueue` (LocalTaskQueue → ARQ, CloudTasksQueue = sketsa).
+- **38 test backend**: `test_orders` (termasuk keyset pagination), `test_intake`, `test_workflow`, `test_metrics`, `test_auth`, `test_ratelimit`, `test_internal`, `test_conversation`, `test_reports` (idempotensi laporan + PDF), `test_taskqueue` (LocalTaskQueue → ARQ, CloudTasksQueue = sketsa).
+- **Frontend**: Vitest unit test (`lib/orders.test.ts`). Semua ini dijalankan lagi otomatis di CI (`.github/workflows/ci.yml`).
 - Database test terpisah (`tokobangunan_test`), tabel dibuat sekali, di-`TRUNCATE` sebelum tiap test.
 - HTTP diuji lewat `httpx.AsyncClient` + `ASGITransport` (tanpa menyalakan server).
 - LLM, queue, channel, dan SMTP **di-mock** dalam test (`monkeypatch`, `AsyncMock`) — test menguji logika aplikasi, bukan AI/jaringan.
 - Fixture `client` sudah "login" sebagai manager; `anon_client` untuk menguji jalur `401`.
-- `ruff check` + `mypy` (BE), `tsc --noEmit` + `next build` (FE) semua lulus.
+- `ruff check` + `mypy` (BE), `tsc --noEmit` + `eslint` + `next build` (FE) semua lulus.

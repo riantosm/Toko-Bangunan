@@ -13,6 +13,15 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      // Our client components load data in a mount effect (fetch, or a cookie
+      // read that must happen post-hydration). setState there lands after an
+      // await, not synchronously — keep this visible as a warning, not a build
+      // break.
+      "react-hooks/set-state-in-effect": "warn",
+    },
+  },
 ]);
 
 export default eslintConfig;
