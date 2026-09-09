@@ -1,0 +1,30 @@
+{"id": "ord-01", "message": "pak mau pesen 5 sak semen gresik", "expected": {"intent": "order", "items": [{"name": "semen gresik", "quantity": 5, "unit": "sak"}]}}
+{"id": "inq-01", "message": "bang triplek 12mm ada? brp harganya", "expected": {"intent": "inquiry", "items": [{"name": "triplek 12mm", "quantity": 1, "unit": "lembar"}]}}
+{"id": "ord-02", "message": "tolong kirim 3 karung semen tiga roda sama 10 batang besi 10", "expected": {"intent": "order", "items": [{"name": "semen tiga roda", "quantity": 3, "unit": "sak"}, {"name": "besi 10", "quantity": 10, "unit": "batang"}]}}
+{"id": "cmp-01", "message": "kmrn beli cat 4 kaleng, 1 bocor mau tukar", "expected": {"intent": "complaint", "items": [{"name": "cat", "quantity": 1, "unit": "kaleng"}]}}
+{"id": "ord-03", "message": "minta 2 galon cat tembok putih", "expected": {"intent": "order", "items": [{"name": "cat tembok putih", "quantity": 2, "unit": "kaleng"}]}}
+{"id": "inq-02", "message": "pasir 2 meter kubik brp ya buat cor", "expected": {"intent": "inquiry", "items": [{"name": "pasir", "quantity": 2, "unit": "m3"}]}}
+{"id": "ord-04", "message": "mau beli paku 3 kg sama 5 lembar seng gelombang", "expected": {"intent": "order", "items": [{"name": "paku", "quantity": 3, "unit": "kg"}, {"name": "seng gelombang", "quantity": 5, "unit": "lembar"}]}}
+{"id": "inq-03", "message": "bu ada keramik 40x40 motif kayu?", "expected": {"intent": "inquiry", "items": [{"name": "keramik 40x40 motif kayu", "quantity": 1, "unit": "dus"}]}}
+{"id": "ord-05", "message": "pesan setengah m3 split", "expected": {"intent": "order", "items": [{"name": "split", "quantity": 0.5, "unit": "m3"}]}}
+{"id": "ord-06", "message": "tolong 1 roll kawat bendrat", "expected": {"intent": "order", "items": [{"name": "kawat bendrat", "quantity": 1, "unit": "roll"}]}}
+{"id": "ord-07", "message": "mau order pipa pvc 4 inch 6 batang", "expected": {"intent": "order", "items": [{"name": "pipa pvc 4 inch", "quantity": 6, "unit": "batang"}]}}
+{"id": "inq-04", "message": "cat kayu coklat tua 1 kaleng ready ga", "expected": {"intent": "inquiry", "items": [{"name": "cat kayu coklat tua", "quantity": 1, "unit": "kaleng"}]}}
+{"id": "ord-08", "message": "kirim semen 20 sak ke proyek jl mawar", "expected": {"intent": "order", "items": [{"name": "semen", "quantity": 20, "unit": "sak"}]}}
+{"id": "ord-09", "message": "beli gypsum 15 lembar plus 4 dus compound", "expected": {"intent": "order", "items": [{"name": "gypsum", "quantity": 15, "unit": "lembar"}, {"name": "compound", "quantity": 4, "unit": "dus"}]}}
+{"id": "ord-10", "message": "tiga sak semen putih dong", "expected": {"intent": "order", "items": [{"name": "semen putih", "quantity": 3, "unit": "sak"}]}}
+{"id": "inq-05", "message": "halo mau nanya harga besi 8 per batang", "expected": {"intent": "inquiry", "items": [{"name": "besi 8", "quantity": 1, "unit": "batang"}]}}
+{"id": "cmp-02", "message": "bos pesenan kemarin kurang 2 sak semen", "expected": {"intent": "complaint", "items": [{"name": "semen", "quantity": 2, "unit": "sak"}]}}
+{"id": "ord-11", "message": "mau ambil 100 bata merah", "expected": {"intent": "order", "items": [{"name": "bata merah", "quantity": 100, "unit": "biji"}]}}
+{"id": "ord-12", "message": "minta 2 kaleng cat tembok", "expected": {"intent": "order", "items": [{"name": "cat tembok", "quantity": 2, "unit": "kaleng"}]}}
+{"id": "ord-13", "message": "pesan 8 batang hollow 4x4 galvanis", "expected": {"intent": "order", "items": [{"name": "hollow 4x4 galvanis", "quantity": 8, "unit": "batang"}]}}
+{"id": "inq-06", "message": "pak paku beton 1/2 kg ada?", "expected": {"intent": "inquiry", "items": [{"name": "paku beton", "quantity": 0.5, "unit": "kg"}]}}
+{"id": "ord-14", "message": "tolong siapkan 12 sak mortar sama 3 roll waterproofing", "expected": {"intent": "order", "items": [{"name": "mortar", "quantity": 12, "unit": "sak"}, {"name": "waterproofing", "quantity": 3, "unit": "roll"}]}}
+{"id": "cmp-03", "message": "kmrn cat yg dikirim warnanya salah, mau komplain", "expected": {"intent": "complaint", "items": [{"name": "cat", "quantity": 1, "unit": "kaleng"}]}}
+{"id": "ord-15", "message": "mau beli 6 lembar kalsiboard 6mm", "expected": {"intent": "order", "items": [{"name": "kalsiboard 6mm", "quantity": 6, "unit": "lembar"}]}}
+{"id": "inq-07", "message": "semen 1 sak berapa sekarang", "expected": {"intent": "inquiry", "items": [{"name": "semen", "quantity": 1, "unit": "sak"}]}}
+{"id": "ord-16", "message": "order: 4 sak semen, 2 m3 pasir, 1 m3 koral", "expected": {"intent": "order", "items": [{"name": "semen", "quantity": 4, "unit": "sak"}, {"name": "pasir", "quantity": 2, "unit": "m3"}, {"name": "koral", "quantity": 1, "unit": "m3"}]}}
+{"id": "ord-17", "message": "bang mau 5 batang reng baja ringan", "expected": {"intent": "order", "items": [{"name": "reng baja ringan", "quantity": 5, "unit": "batang"}]}}
+{"id": "ord-18", "message": "tolong 2 dus keramik 25x25 putih", "expected": {"intent": "order", "items": [{"name": "keramik 25x25 putih", "quantity": 2, "unit": "dus"}]}}
+{"id": "ord-19", "message": "ada lem pipa yg kaleng kecil? mau 3", "expected": {"intent": "order", "items": [{"name": "lem pipa", "quantity": 3, "unit": "kaleng"}]}}
+{"id": "ord-20", "message": "pesen thinner 1 galon", "expected": {"intent": "order", "items": [{"name": "thinner", "quantity": 1, "unit": "kaleng"}]}}
