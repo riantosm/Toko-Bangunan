@@ -4,7 +4,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
-from app.routers import auth, jobs, metrics, orders, products, workflow, workflow
+from app.core.errors import register_error_handlers
+from app.core.logging import RequestIdMiddleware, configure_logging
+from app.routers import auth, jobs, metrics, orders, products, workflow
+
+configure_logging()
 
 app = FastAPI(title="Toko Bangunan API")
 
@@ -13,14 +17,16 @@ app.add_middleware(
     allow_origins=["http://localhost:3000"],
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-Id"],
 )
+app.add_middleware(RequestIdMiddleware)
+
+register_error_handlers(app)
 
 app.include_router(auth.router)
 app.include_router(orders.router)
 app.include_router(products.router)
 app.include_router(jobs.router)
-app.include_router(workflow.router)
-app.include_router(metrics.router)
 app.include_router(workflow.router)
 app.include_router(metrics.router)
 
