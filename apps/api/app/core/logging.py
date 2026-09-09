@@ -5,9 +5,7 @@ import sys
 import time
 import uuid
 
-request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "request_id", default="-"
-)
+request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
 
 
 class JsonFormatter(logging.Formatter):
@@ -33,6 +31,8 @@ def configure_logging() -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(logging.INFO)
+    for noisy in ("httpx", "httpcore", "python_multipart", "watchfiles"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 access_logger = logging.getLogger("app.access")
@@ -57,9 +57,7 @@ class RequestIdMiddleware:
         async def send_wrapper(message) -> None:
             if message["type"] == "http.response.start":
                 status_code["v"] = message["status"]
-                message.setdefault("headers", []).append(
-                    (b"x-request-id", rid.encode())
-                )
+                message.setdefault("headers", []).append((b"x-request-id", rid.encode()))
             await send(message)
 
         try:

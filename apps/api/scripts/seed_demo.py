@@ -1,6 +1,6 @@
 import asyncio
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, select
 
@@ -9,7 +9,7 @@ from app.models.order import Order
 from app.models.workflow import StepType, WorkflowStep
 
 random.seed(42)
-NOW = datetime.now(timezone.utc)
+NOW = datetime.now(UTC)
 
 
 async def main() -> None:
@@ -23,9 +23,7 @@ async def main() -> None:
         await s.commit()
 
         for i in range(40):
-            created = NOW - timedelta(
-                days=random.uniform(0, 14), hours=random.uniform(0, 10)
-            )
+            created = NOW - timedelta(days=random.uniform(0, 14), hours=random.uniform(0, 10))
             order = Order(
                 customer_name=f"DEMO Pelanggan {i + 1}",
                 status="confirmed",

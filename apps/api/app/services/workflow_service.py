@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -13,7 +13,7 @@ VALID_OUTCOMES = {"approved", "rejected", "skipped"}
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def step_to_read(step: WorkflowStep) -> WorkflowStepRead:
@@ -26,9 +26,7 @@ def step_to_read(step: WorkflowStep) -> WorkflowStepRead:
         completed_at=step.completed_at,
         outcome=step.outcome,
         sla_target_minutes=step.sla_target_minutes,
-        elapsed_minutes=(
-            float(step.elapsed_minutes) if step.elapsed_minutes is not None else None
-        ),
+        elapsed_minutes=(float(step.elapsed_minutes) if step.elapsed_minutes is not None else None),
     )
 
 
@@ -42,13 +40,9 @@ async def confirm_order(session: AsyncSession, order_id: int) -> Order:
             f"order berstatus '{order.status}', tidak bisa dikonfirmasi",
         )
 
-    step_types = (
-        await session.scalars(select(StepType).order_by(StepType.seq))
-    ).all()
+    step_types = (await session.scalars(select(StepType).order_by(StepType.seq))).all()
     if not step_types:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "step_types belum di-seed"
-        )
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "step_types belum di-seed")
 
     for i, st in enumerate(step_types):
         session.add(
@@ -76,9 +70,7 @@ async def list_steps(session: AsyncSession, order_id: int) -> list[WorkflowStep]
     )
 
 
-async def complete_step(
-    session: AsyncSession, step_id: int, outcome: str
-) -> WorkflowStep:
+async def complete_step(session: AsyncSession, step_id: int, outcome: str) -> WorkflowStep:
     if outcome not in VALID_OUTCOMES:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,

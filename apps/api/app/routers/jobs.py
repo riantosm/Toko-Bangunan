@@ -14,12 +14,8 @@ router = APIRouter(
 
 
 @router.get("/{job_id}", response_model=JobRead)
-async def get_job(
-    job_id: str, session: AsyncSession = Depends(get_session)
-) -> Job:
+async def get_job(job_id: str, session: AsyncSession = Depends(get_session)) -> Job:
     job = await session.get(Job, job_id)
     if job is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="job tidak ditemukan"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job tidak ditemukan")
     return job

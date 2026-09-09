@@ -1,5 +1,5 @@
 from collections.abc import Callable, Coroutine
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Depends, Response
@@ -25,22 +25,18 @@ _SQL = text(
 )
 
 
-def rate_limit(
-    *, scope: str, limit_setting: str
-) -> Callable[..., Coroutine[Any, Any, None]]:
+def rate_limit(*, scope: str, limit_setting: str) -> Callable[..., Coroutine[Any, Any, None]]:
     async def dep(
         response: Response,
         user: User = Depends(get_current_user),
         session: AsyncSession = Depends(get_session),
     ) -> None:
         limit = int(getattr(settings, limit_setting))
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         window_start = now.replace(second=0, microsecond=0)
         bucket_key = f"{scope}:user:{user.id}"
 
-        count = await session.scalar(
-            _SQL, {"k": bucket_key, "w": window_start}
-        )
+        count = await session.scalar(_SQL, {"k": bucket_key, "w": window_start})
         await session.commit()
         count = int(count or 0)
 

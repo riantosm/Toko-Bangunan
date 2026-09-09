@@ -10,9 +10,7 @@ async def get_by_id(session: AsyncSession, order_id: int) -> Order | None:
     return await session.scalar(stmt)
 
 
-async def list_paginated(
-    session: AsyncSession, page: int, size: int
-) -> tuple[list[Order], int]:
+async def list_paginated(session: AsyncSession, page: int, size: int) -> tuple[list[Order], int]:
     total = await session.scalar(select(func.count()).select_from(Order)) or 0
     stmt = (
         select(Order)

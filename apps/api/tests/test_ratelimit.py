@@ -7,9 +7,7 @@ from app.services import order_service
 
 async def test_intake_rate_limited(client, monkeypatch) -> None:
     monkeypatch.setattr(settings, "rate_limit_intake_per_min", 3)
-    monkeypatch.setattr(
-        order_service, "get_queue", AsyncMock(return_value=AsyncMock())
-    )
+    monkeypatch.setattr(order_service, "get_queue", AsyncMock(return_value=AsyncMock()))
 
     codes = []
     for _ in range(5):

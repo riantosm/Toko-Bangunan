@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest_asyncio
 
@@ -6,7 +6,7 @@ from app.models.order import Order
 from app.models.workflow import StepType, WorkflowStep
 from app.services import metrics_service
 
-NOW = datetime.now(timezone.utc)
+NOW = datetime.now(UTC)
 
 
 @pytest_asyncio.fixture
@@ -33,11 +33,13 @@ async def data(session) -> None:
     session.add_all([o1, o2, o3])
     await session.flush()
 
-    session.add_all([
-        step(o1.id, 1500, 30),    # dalam SLA
-        step(o2.id, 3000, 120),   # lewat SLA
-        step(o3.id, 300, None),   # masih menunggu
-    ])
+    session.add_all(
+        [
+            step(o1.id, 1500, 30),  # dalam SLA
+            step(o2.id, 3000, 120),  # lewat SLA
+            step(o3.id, 300, None),  # masih menunggu
+        ]
+    )
     await session.commit()
 
 

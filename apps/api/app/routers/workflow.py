@@ -28,9 +28,7 @@ async def list_steps(
     return [workflow_service.step_to_read(s) for s in steps]
 
 
-@router.post(
-    "/workflow-steps/{step_id}/complete", response_model=WorkflowStepRead
-)
+@router.post("/workflow-steps/{step_id}/complete", response_model=WorkflowStepRead)
 async def complete_step(
     step_id: int,
     payload: CompleteStepRequest,

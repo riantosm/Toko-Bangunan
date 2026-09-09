@@ -92,9 +92,7 @@ def register_error_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(StarletteHTTPException)
-    async def _http_exc(
-        request: Request, exc: StarletteHTTPException
-    ) -> JSONResponse:
+    async def _http_exc(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         code = _STATUS_CODE.get(exc.status_code, "http_error")
         return JSONResponse(
             status_code=exc.status_code,
@@ -103,12 +101,8 @@ def register_error_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(RequestValidationError)
-    async def _validation(
-        request: Request, exc: RequestValidationError
-    ) -> JSONResponse:
-        details = [
-            {"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()
-        ]
+    async def _validation(request: Request, exc: RequestValidationError) -> JSONResponse:
+        details = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
         return JSONResponse(
             status_code=422,
             content=_envelope("validation_error", "Input tidak valid", details),

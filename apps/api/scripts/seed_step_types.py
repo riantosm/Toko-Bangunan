@@ -17,9 +17,7 @@ async def main() -> None:
         for name, seq, sla in STEPS:
             if await session.scalar(select(StepType).where(StepType.name == name)):
                 continue
-            session.add(
-                StepType(name=name, seq=seq, default_sla_minutes=sla)
-            )
+            session.add(StepType(name=name, seq=seq, default_sla_minutes=sla))
         await session.commit()
     print("seed step_types selesai")
 

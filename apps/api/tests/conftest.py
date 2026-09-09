@@ -30,9 +30,7 @@ async def _create_schema() -> AsyncGenerator[None, None]:
 async def _clean_tables() -> AsyncGenerator[None, None]:
     async with engine.begin() as conn:
         for tbl in reversed(Base.metadata.sorted_tables):
-            await conn.execute(
-                text(f'TRUNCATE "{tbl.name}" RESTART IDENTITY CASCADE')
-            )
+            await conn.execute(text(f'TRUNCATE "{tbl.name}" RESTART IDENTITY CASCADE'))
     yield
 
 
@@ -48,9 +46,7 @@ async def anon_client(session) -> AsyncGenerator[AsyncClient, None]:
         yield session
 
     app.dependency_overrides[get_session] = _override
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
 
