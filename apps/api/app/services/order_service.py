@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.taskqueue import get_task_queue
 from app.models.job import Job
 from app.models.order import Order, OrderItem
 from app.models.processed_request import ProcessedRequest
@@ -10,7 +11,6 @@ from app.repositories import order_repo
 from app.schemas.order import OrderCreate, OrderListResponse, OrderListRow
 from app.services.extraction import ExtractionError, extract_order
 from app.services.matching import match_product
-from app.workers.queue import get_queue
 
 CONFIDENCE_THRESHOLD = 0.6
 
@@ -63,8 +63,7 @@ async def enqueue_intake(
 
     await session.commit()
 
-    queue = await get_queue()
-    await queue.enqueue_job("process_intake_job", job.id, customer_name, body)
+    await get_task_queue().enqueue("process_intake_job", job.id, customer_name, body)
     return job
 
 

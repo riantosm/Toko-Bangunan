@@ -1,5 +1,4 @@
 from decimal import Decimal
-from unittest.mock import AsyncMock
 
 import pytest_asyncio
 
@@ -101,18 +100,14 @@ async def test_run_intake_sets_error_on_extraction_failure(session, monkeypatch)
     assert job.error
 
 
-async def test_intake_endpoint_returns_202(client, monkeypatch) -> None:
-    fake_queue = AsyncMock()
-    monkeypatch.setattr(order_service, "get_queue", AsyncMock(return_value=fake_queue))
+async def test_intake_endpoint_returns_202(client, fake_task_queue) -> None:
     r = await client.post("/orders/intake", json={"customer_name": "Andi", "body": "x"})
     assert r.status_code == 202
     assert "job_id" in r.json()
-    fake_queue.enqueue_job.assert_awaited_once()
+    fake_task_queue.enqueue.assert_awaited_once()
 
 
-async def test_intake_endpoint_is_idempotent(client, monkeypatch) -> None:
-    fake_queue = AsyncMock()
-    monkeypatch.setattr(order_service, "get_queue", AsyncMock(return_value=fake_queue))
+async def test_intake_endpoint_is_idempotent(client, fake_task_queue) -> None:
     headers = {"Idempotency-Key": "key-abc-123"}
     body = {"customer_name": "Andi", "body": "x"}
 
@@ -121,4 +116,4 @@ async def test_intake_endpoint_is_idempotent(client, monkeypatch) -> None:
 
     assert r1.status_code == 202
     assert r1.json()["job_id"] == r2.json()["job_id"]
-    assert fake_queue.enqueue_job.await_count == 1
+    assert fake_task_queue.enqueue.await_count == 1

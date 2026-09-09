@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.errors import UnauthorizedError
-from app.workers.queue import get_queue
+from app.core.taskqueue import get_task_queue
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
@@ -22,8 +22,7 @@ async def wa_message(
 ) -> dict[str, str]:
     if x_internal_secret != settings.internal_api_secret:
         raise UnauthorizedError("bad internal secret")
-    queue = await get_queue()
-    await queue.enqueue_job(
+    await get_task_queue().enqueue(
         "process_wa_message", payload.wa_id, payload.body, payload.name_hint
     )
     return {"status": "queued"}
