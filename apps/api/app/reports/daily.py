@@ -220,5 +220,5 @@ async def run_daily_report(
         )
     )
     await session.commit()
-    logger.info("nightly report sent", extra={"path": day.isoformat()})
+    logger.info("nightly report sent for %s", day.isoformat())
     return {"status": "sent", "date": day.isoformat(), "summary": summary}

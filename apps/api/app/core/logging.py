@@ -31,7 +31,7 @@ def configure_logging() -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(logging.INFO)
-    for noisy in ("httpx", "httpcore", "python_multipart", "watchfiles"):
+    for noisy in ("httpx", "httpcore", "python_multipart", "watchfiles", "apscheduler"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
