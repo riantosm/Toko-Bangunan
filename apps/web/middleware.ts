@@ -1,7 +1,7 @@
 import { jwtVerify } from "jose";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PREFIXES = ["/login"];
+const PUBLIC_PREFIXES = ["/login", "/api/webhooks"];
 const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? "");
 
 async function tokenIsValid(token: string): Promise<boolean> {

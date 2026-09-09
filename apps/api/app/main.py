@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
 from app.core.errors import register_error_handlers
 from app.core.logging import RequestIdMiddleware, configure_logging
-from app.routers import auth, jobs, metrics, orders, products, workflow
+from app.routers import auth, internal, jobs, metrics, orders, products, workflow
 
 configure_logging()
 
@@ -24,6 +24,7 @@ app.add_middleware(RequestIdMiddleware)
 register_error_handlers(app)
 
 app.include_router(auth.router)
+app.include_router(internal.router)
 app.include_router(orders.router)
 app.include_router(products.router)
 app.include_router(jobs.router)
