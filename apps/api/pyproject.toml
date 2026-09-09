@@ -5,6 +5,7 @@ description = "Toko Bangunan API"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiosmtplib>=5.1.3",
     "alembic>=1.19.2",
     "argon2-cffi>=25.1.0",
     "arq>=0.28.0",
@@ -12,6 +13,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "pydantic-settings>=2.15.0",
     "pyjwt>=2.13.0",
+    "reportlab>=5.0.1",
     "sqlalchemy[asyncio]>=2.0.52",
     "uvicorn[standard]>=0.52.4",
 ]
@@ -42,3 +44,4 @@ ignore = ["B008"]  # FastAPI Depends() in defaults is intentional
 "alembic/versions/*" = ["E501", "I001", "UP007", "UP035"]
 "tests/*" = ["S101"]
 "app/services/metrics_service.py" = ["E501"]  # embedded SQL strings
+"app/reports/daily.py" = ["E501"]  # embedded SQL strings
