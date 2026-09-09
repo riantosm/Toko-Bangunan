@@ -26,7 +26,7 @@ pencatatan durasi, dan manajemen memantau **dashboard SLA**.
 | 9 | Laporan harian terjadwal (APScheduler → PDF → email) + abstraksi `TaskQueue` | ✅ |
 | 10 | PostgreSQL performance lab — `EXPLAIN (ANALYZE, BUFFERS)`, index, CTE/window; keyset pagination | ✅ |
 | 11 | CI (GitHub Actions — 2 job: api ruff/mypy/pytest, web typecheck/lint/vitest/build) | ✅ |
-| 12 | Evaluasi akurasi AI (gold set, metrik F1) | ⬜ |
+| 12 | Evaluasi akurasi AI (gold set 30, harness metrik F1/MAE/halusinasi) | ✅ |
 | 13 | Deploy cloud (Vercel + Cloud Run) + WhatsApp Cloud API + Cloud Tasks | ⬜ |
 
 Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
@@ -127,6 +127,15 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 - **Vitest** ditambahkan di `apps/web` — unit test murni (`lib/orders.test.ts`: `parseCursor` untuk cursor keyset).
 - Branch protection ("wajib 2 check hijau + 1 review sebelum merge") diaktifkan di Settings repo GitHub.
 
+### 12. Evaluasi akurasi AI
+- **`apps/api/eval/`** — harness untuk mengukur `extract_order()` supaya perubahan prompt/model bisa dibandingkan dengan angka.
+  - `gold.jsonl` — 30 contoh + anotasi manual (typo, sinonim satuan `karung→sak`/`galon→kaleng`, kata bilangan `setengah→0.5`, multi-item, 3 intent).
+  - `metrics.py` — skoring **murni & ter-unit-test**: alignment item greedy (SequenceMatcher ≥ 0.6), lalu cek `name`/`unit`/`quantity`.
+  - `run.py` — jalankan model ke semua contoh, cetak tabel, simpan `results/<timestamp>.json` (dengan `prompt_hash`).
+- **Metrik**: JSON validity rate · intent accuracy & macro-F1 & P/R/F1 per kelas · order exact-match · item P/R/F1 · unit/qty accuracy · **qty MAE** · **hallucination rate**.
+- **Regression testing prompt**: `prompt_hash` (SHA-256 dari file prompt) tersimpan di tiap hasil → ubah 1 kalimat prompt, jalankan lagi, diff dua `results/*.json`.
+- `uv run python -m eval.run --model gemma3:1b` → A/B model.
+
 ### Fondasi lintas fitur
 - **Desain sistem** (`apps/web/app/globals.css` + `apps/web/app/components/ui.tsx`): tema **light**, token Tailwind v4 `@theme`, hairline border, satu aksen violet, primitif bersama (`Card`, `Button`, `Badge`, `Table`, `Field`, …).
 - **Migrasi** semua lewat Alembic (autogenerate + edit manual untuk `pg_trgm` & generated column).
@@ -203,6 +212,7 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 | Background jobs | **ARQ** + **Redis 7**, di balik abstraksi **`TaskQueue`** (local ARQ / Cloud Tasks sketch) | Task async, proses worker terpisah, retry, idempotensi; transport bisa ditukar (Q3) |
 | Laporan terjadwal | **APScheduler** (cron di `lifespan`) + **reportlab** (PDF) + **aiosmtplib** (SMTP async) + **Mailpit** (dev) | Laporan harian SLA → PDF → email, idempoten per tanggal |
 | LLM lokal | **Ollama** + **Gemma 3** (`gemma3:4b` / `gemma3:1b`) | Ekstraksi order **tanpa biaya token** (Q1) |
+| Eval AI | harness sendiri (`eval/`) — gold set 30, F1/MAE/hallucination rate, `prompt_hash` | Bandingkan versi prompt/model dengan angka |
 | Auth | **PyJWT** (HS256) + **Argon2** (`argon2-cffi`); middleware Next.js verifikasi signature pakai **`jose`** — OAuth/OIDC *(rencana)* | Stateless, standar industri |
 | Rate limiting | tabel **`rate_counters`** + `INSERT … ON CONFLICT` (fixed window, tanpa Redis) | `429` + `Retry-After` + `X-RateLimit-*` |
 | Observability | **structured logging JSON** + `requestId` (contextvar → `X-Request-Id`) · Sentry *(rencana)* | Korelasi log ↔ response |
@@ -275,6 +285,7 @@ nextjs_python/
 │       │   └── prompts/
 │       ├── alembic/versions/         # migrasi
 │       ├── db_lab/                   # perf lab: seed 1M rows, queries.sql, NOTES.md
+│       ├── eval/                     # akurasi AI: gold.jsonl, metrics.py, run.py
 │       ├── scripts/                  # seed_* + try_* (eksplorasi)
 │       └── tests/
 ├── .github/workflows/ci.yml          # 2 job: api (ruff/mypy/pytest) · web (tsc/eslint/vitest/build)
@@ -386,7 +397,7 @@ cd apps/api && uv run pytest -q          # backend
 cd apps/web && pnpm test                 # frontend (vitest)
 ```
 
-- **38 test backend**: `test_orders` (termasuk keyset pagination), `test_intake`, `test_workflow`, `test_metrics`, `test_auth`, `test_ratelimit`, `test_internal`, `test_conversation`, `test_reports` (idempotensi laporan + PDF), `test_taskqueue` (LocalTaskQueue → ARQ, CloudTasksQueue = sketsa).
+- **42 test backend**: `test_orders` (termasuk keyset pagination), `test_intake`, `test_workflow`, `test_metrics`, `test_auth`, `test_ratelimit`, `test_internal`, `test_conversation`, `test_reports` (idempotensi laporan + PDF), `test_taskqueue` (LocalTaskQueue → ARQ, CloudTasksQueue = sketsa), `test_eval` (skoring metrik ekstraksi).
 - **Frontend**: Vitest unit test (`lib/orders.test.ts`). Semua ini dijalankan lagi otomatis di CI (`.github/workflows/ci.yml`).
 - Database test terpisah (`tokobangunan_test`), tabel dibuat sekali, di-`TRUNCATE` sebelum tiap test.
 - HTTP diuji lewat `httpx.AsyncClient` + `ASGITransport` (tanpa menyalakan server).

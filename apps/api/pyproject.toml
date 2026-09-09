@@ -31,7 +31,7 @@ dev = [
 
 [tool.mypy]
 python_version = "3.12"
-files = ["app"]
+files = ["app", "eval"]
 ignore_missing_imports = false
 
 [[tool.mypy.overrides]]

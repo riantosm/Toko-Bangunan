@@ -26,6 +26,10 @@ __pycache__/
 .idea/
 *.log
 
+# AI eval run outputs (keep the dir, not the results)
+apps/api/eval/results/*
+!apps/api/eval/results/.gitkeep
+
 # private prep docs — kept locally, not on GitHub
 /Prescreening-Answers.docx
 /LEARNING-PATH.md
