@@ -10,6 +10,29 @@ pencatatan durasi, dan manajemen memantau **dashboard SLA**.
 
 ---
 
+## Roadmap
+
+| # | Bagian | Status |
+|---|---|---|
+| 0 | Setup — Docker, Alembic, FastAPI + Next skeleton | ✅ |
+| 1 | Order CRUD (REST, layering, tests) | ✅ |
+| 2 | AI Intake (Ollama, structured output, fuzzy match) | ✅ |
+| 3 | Async jobs (ARQ + Redis, polling, idempotensi) | ✅ |
+| 4 | Workflow + SLA (state machine, generated column) | ✅ |
+| 5 | Dashboard SLA (agregasi SQL, Recharts) | ✅ |
+| 6 | Auth (JWT + role, middleware, login/logout) | ✅ |
+| 7 | API hardening — rate limiting + error envelope + requestId | ⬜ |
+| 8 | Kanal WhatsApp — webhook + HMAC, auto-reply, state percakapan (dev pakai simulator) | ⬜ |
+| 9 | Laporan harian terjadwal (APScheduler → email) + abstraksi `TaskQueue` | ⬜ |
+| 10 | PostgreSQL performance lab — `EXPLAIN (ANALYZE, BUFFERS)`, index, partisi, CTE | ⬜ |
+| 11 | CI (GitHub Actions — lint + test) | ⬜ |
+| 12 | Evaluasi akurasi AI (gold set, metrik F1) | ⬜ |
+| 13 | Deploy cloud (Vercel + Cloud Run) + WhatsApp Cloud API + Cloud Tasks | ⬜ |
+
+Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
+
+---
+
 ## Daftar Isi
 
 1. [Ringkasan Fitur](#ringkasan-fitur)
@@ -20,7 +43,6 @@ pencatatan durasi, dan manajemen memantau **dashboard SLA**.
 6. [Model Data](#model-data)
 7. [Daftar Endpoint](#daftar-endpoint)
 8. [Testing](#testing)
-9. [Roadmap](#roadmap)
 
 ---
 
@@ -127,19 +149,31 @@ pencatatan durasi, dan manajemen memantau **dashboard SLA**.
 
 ## Tech Stack
 
-| Layer | Teknologi |
-|---|---|
-| Frontend | Next.js 16 · React 19 · TypeScript · Tailwind CSS v4 (`@theme`) · Recharts |
-| Backend | FastAPI · Python 3.12 · Pydantic v2 · pydantic-settings |
-| ORM / Migrasi | SQLAlchemy 2.0 (async) · Alembic |
-| Database | PostgreSQL 16 (+ ekstensi `pg_trgm`, generated column) |
-| Queue / Worker | ARQ · Redis 7 |
-| LLM lokal | Ollama · Gemma 3 (`gemma3:4b` atau `gemma3:1b`) |
-| Auth | PyJWT (HS256) · Argon2 (`argon2-cffi`) |
-| Testing | pytest · pytest-asyncio · httpx (`ASGITransport`) |
-| Kualitas | Ruff · mypy · ESLint · TypeScript strict |
-| Infrastruktur | Docker Compose |
-| Package manager | `uv` (Python) · `pnpm` (JS) |
+| Layer | Teknologi | Alasan |
+|---|---|---|
+| Frontend | **Next.js 16** (App Router) + **React 19** + **TypeScript** | RSC/SSR, routing modern, type-safety |
+| Styling | **Tailwind CSS v4** (`@theme`) + primitif sendiri (`app/components/ui.tsx`) | Design system konsisten, hairline, satu aksen |
+| Charting | **Recharts** | Chart dashboard, warna dari CSS variable |
+| Backend / API | **Python 3.12** + **FastAPI** | Async native, OpenAPI otomatis, performa tinggi |
+| Validasi & config | **Pydantic v2** + **pydantic-settings** | Kontrak data ketat FE–BE, config dari env |
+| ORM / Migrasi | **SQLAlchemy 2.0** (async) + **Alembic** | Query kompleks + versioning schema |
+| Database | **PostgreSQL 16** (+ ekstensi **`pg_trgm`**, **generated column**, JSONB) | JOIN kompleks, agregasi, indexing, fuzzy match |
+| Background jobs | **ARQ** + **Redis 7** | Task async, proses worker terpisah, retry, idempotensi |
+| LLM lokal | **Ollama** + **Gemma 3** (`gemma3:4b` / `gemma3:1b`) | Ekstraksi order **tanpa biaya token** (Q1) |
+| Auth | **PyJWT** (HS256) + **Argon2** (`argon2-cffi`) — OAuth/OIDC *(rencana)* | Stateless, standar industri |
+| Testing BE | **pytest** + **pytest-asyncio** + **httpx** (`ASGITransport`) — coverage *(rencana)* | Test API & unit tanpa menyalakan server |
+| Testing FE | **tsc --noEmit** + **ESLint** — Vitest / Playwright *(rencana, Fase 11)* | Type-check + unit/E2E |
+| Kualitas kode | **Ruff** + **mypy** (BE) · **ESLint** + **TypeScript strict** (FE) | Lint & type-check |
+| Kontainer | **Docker Compose** (Postgres, Redis) | Infrastruktur dev reproducible |
+| Version control | **Git** + **GitHub** — *Conventional Commits* | Riwayat rapi, commit kecil |
+| CI/CD | **GitHub Actions** *(rencana, Fase 11)* | Lint → test tiap PR |
+| Observability | structured logging JSON + `requestId` *(rencana, Fase 7)* · Sentry *(rencana)* | Debugging |
+| Kanal WhatsApp | **WhatsApp Cloud API** (Meta) + webhook **HMAC** *(rencana, Fase 8)* — dev pakai simulator | Chat pelanggan → order otomatis |
+| Cloud | **Vercel** (web) + **Cloud Run** (api) + **Cloud SQL** + **Cloud Tasks / Scheduler** *(rencana, Fase 13)* | Sesuai target produksi; demo jalan lokal |
+| AI coding assistant | **Claude Code** | Scaffolding, test, review |
+| Package manager | **uv** (Python) · **pnpm** (JS) | Cepat, lockfile deterministik |
+
+*Baris bertanda **(rencana)** belum diimplementasikan — lihat [Roadmap](#roadmap).*
 
 ---
 
@@ -293,23 +327,3 @@ cd apps/api && uv run pytest -q
 - HTTP diuji lewat `httpx.AsyncClient` + `ASGITransport` (tanpa menyalakan server).
 - LLM & queue **di-mock** dalam test (`monkeypatch`, `AsyncMock`) — test menguji logika aplikasi, bukan AI.
 - Fixture `client` sudah "login" sebagai manager; `anon_client` untuk menguji jalur `401`.
-
----
-
-## Roadmap
-
-| # | Bagian | Status |
-|---|---|---|
-| 0 | Setup — Docker, Alembic, FastAPI + Next skeleton | ✅ |
-| 1 | Order CRUD (REST, layering, tests) | ✅ |
-| 2 | AI Intake (Ollama, structured output, fuzzy match) | ✅ |
-| 3 | Async jobs (ARQ + Redis, polling, idempotensi) | ✅ |
-| 4 | Workflow + SLA (state machine, generated column) | ✅ |
-| 5 | Dashboard SLA (agregasi SQL, Recharts) | ✅ |
-| 6 | Auth (JWT + role, middleware, login/logout) | ✅ |
-| 7 | API hardening — rate limiting + error envelope + requestId | ⬜ |
-| 8 | Laporan harian terjadwal (APScheduler → email) | ⬜ |
-| 9 | PostgreSQL performance lab — `EXPLAIN (ANALYZE, BUFFERS)`, index, partisi, CTE | ⬜ |
-| 10 | CI (GitHub Actions — lint + test) | ⬜ |
-| 11 | Evaluasi akurasi AI (gold set, metrik F1) | ⬜ |
-| 12 | Deploy cloud (Vercel + Cloud Run) | ⬜ |
