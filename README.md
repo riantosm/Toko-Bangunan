@@ -8,6 +8,9 @@ pencatatan durasi, dan manajemen memantau **dashboard SLA**.
 - **`apps/web`** — frontend Next.js 16 (App Router, React 19, Tailwind v4)
 - **`apps/api`** — backend FastAPI (Python 3.12, async SQLAlchemy 2.0)
 
+> **Status:** Fase 0–12 selesai — demo lokal lengkap & berjalan end-to-end (Docker + Ollama).
+> 42 test backend + Vitest hijau, CI aktif. Fase 13 (deploy cloud) ditunda, opsional.
+
 ---
 
 ## Roadmap
@@ -27,9 +30,13 @@ pencatatan durasi, dan manajemen memantau **dashboard SLA**.
 | 10 | PostgreSQL performance lab — `EXPLAIN (ANALYZE, BUFFERS)`, index, CTE/window; keyset pagination | ✅ |
 | 11 | CI (GitHub Actions — 2 job: api ruff/mypy/pytest, web typecheck/lint/vitest/build) | ✅ |
 | 12 | Evaluasi akurasi AI (gold set 30, harness metrik F1/MAE/halusinasi) | ✅ |
-| 13 | Deploy cloud (Vercel + Cloud Run) + WhatsApp Cloud API + Cloud Tasks | ⬜ |
+| 13 | Deploy cloud (Vercel + Cloud Run) + WhatsApp Cloud API + Cloud Tasks | ⏸️ opsional — ditunda |
 
-Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
+**Status: Fase 0–12 selesai** ✅ — cakupan proyek (demo lokal) sudah lengkap dan
+berjalan end-to-end (Docker + Ollama). Fase 13 (deploy cloud) sengaja ditunda:
+titik ganti-nya sudah disiapkan di kode — `TaskQueue` (`CloudTasksQueue` sketsa),
+`MessageChannel` (`WhatsAppChannel` siap pakai bila `WHATSAPP_TOKEN` diisi),
+env-driven config — jadi bisa diaktifkan kapan saja tanpa mengubah kode bisnis.
 
 ---
 
