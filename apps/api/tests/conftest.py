@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
@@ -70,3 +71,19 @@ async def client(anon_client, manager_user) -> AsyncClient:
     token = create_access_token(user_id=manager_user.id, role=manager_user.role)
     anon_client.headers["Authorization"] = f"Bearer {token}"
     return anon_client
+
+
+@pytest.fixture(autouse=True)
+def fake_task_queue(monkeypatch):
+    """No test hits Redis: every get_task_queue() returns a stub with an
+    AsyncMock .enqueue. Request the fixture to assert on enqueue calls."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.routers import internal
+    from app.services import order_service
+
+    tq = MagicMock()
+    tq.enqueue = AsyncMock()
+    monkeypatch.setattr(order_service, "get_task_queue", lambda: tq)
+    monkeypatch.setattr(internal, "get_task_queue", lambda: tq)
+    return tq

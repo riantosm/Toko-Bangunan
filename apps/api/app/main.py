@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
 from app.core.errors import register_error_handlers
 from app.core.logging import RequestIdMiddleware, configure_logging
+from app.core.scheduler import lifespan
 from app.routers import (
     auth,
     conversations,
@@ -20,7 +21,7 @@ from app.routers import (
 
 configure_logging()
 
-app = FastAPI(title="Toko Bangunan API")
+app = FastAPI(title="Toko Bangunan API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
