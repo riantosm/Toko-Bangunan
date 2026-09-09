@@ -9,6 +9,17 @@ function auth(token?: string): Record<string, string> {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
+/** Read the API's error envelope `{ error: { code, message, requestId } }`. */
+async function errorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json();
+    if (body?.error?.message) return body.error.message as string;
+  } catch {
+    /* not JSON */
+  }
+  return fallback;
+}
+
 async function req<T>(path: string, init: RequestInit, token?: string): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     cache: "no-store",
@@ -17,7 +28,7 @@ async function req<T>(path: string, init: RequestInit, token?: string): Promise<
   });
   if (!res.ok) {
     throw new Error(
-      (await res.text()) || `${init.method ?? "GET"} ${path} -> ${res.status}`,
+      await errorMessage(res, `${init.method ?? "GET"} ${path} -> ${res.status}`),
     );
   }
   return res.json() as Promise<T>;
@@ -76,7 +87,7 @@ export async function login(
     body: JSON.stringify({ email, password }),
   });
   if (res.status === 401) throw new Error("Email atau password salah.");
-  if (!res.ok) throw new Error(`login -> ${res.status}`);
+  if (!res.ok) throw new Error(await errorMessage(res, `login -> ${res.status}`));
   return res.json();
 }
 
@@ -90,7 +101,7 @@ export async function getOrder(id: string, token?: string): Promise<Order | null
     headers: auth(token),
   });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`GET /orders/${id} -> ${res.status}`);
+  if (!res.ok) throw new Error(await errorMessage(res, `GET /orders/${id} -> ${res.status}`));
   return res.json();
 }
 
