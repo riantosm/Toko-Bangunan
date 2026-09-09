@@ -8,6 +8,7 @@ import {
 } from "@/app/components/ui";
 import { getOrders } from "@/lib/api";
 import { requireToken } from "@/lib/guard";
+import { parseCursor } from "@/lib/orders";
 
 import { OrderRow } from "./order-row";
 
@@ -20,7 +21,7 @@ export default async function OrdersPage({
 }) {
   const token = await requireToken();
   const { after: afterParam } = await searchParams;
-  const after = afterParam ? Number(afterParam) : undefined;
+  const after = parseCursor(afterParam);
   const data = await getOrders(after, token);
 
   return (
