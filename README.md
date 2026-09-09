@@ -24,7 +24,7 @@ pencatatan durasi, dan manajemen memantau **dashboard SLA**.
 | 7 | API hardening — rate limiting + error envelope + requestId + middleware JWT signature | ✅ |
 | 8 | Kanal WhatsApp — webhook + HMAC, auto-reply, state percakapan, simulator; departments/workflow_types | ✅ |
 | 9 | Laporan harian terjadwal (APScheduler → PDF → email) + abstraksi `TaskQueue` | ✅ |
-| 10 | PostgreSQL performance lab — `EXPLAIN (ANALYZE, BUFFERS)`, index, partisi, CTE | ⬜ |
+| 10 | PostgreSQL performance lab — `EXPLAIN (ANALYZE, BUFFERS)`, index, CTE/window; keyset pagination | ✅ |
 | 11 | CI (GitHub Actions — lint + test) | ⬜ |
 | 12 | Evaluasi akurasi AI (gold set, metrik F1) | ⬜ |
 | 13 | Deploy cloud (Vercel + Cloud Run) + WhatsApp Cloud API + Cloud Tasks | ⬜ |
@@ -113,6 +113,11 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 - **Endpoint `POST /internal/nightly-report`** (header `X-Internal-Secret`, opsional `?date=` & `?force=`) — "HTTP worker" yang dipanggil scheduler/Cloud Scheduler.
 - **APScheduler di `lifespan` FastAPI** — cron `0 22 * * *` (`Asia/Jakarta`, `misfire_grace_time=1h`) memanggil report; **digerbang `SCHEDULER_ENABLED`** (default `false`) — 1 proses, tanpa worker terpisah.
 - **`TaskQueue` ABC** (`app/core/taskqueue.py`) — jawaban **Q3**: `LocalTaskQueue` (push ke ARQ/Redis) dipakai demo & test; `CloudTasksQueue` (sketsa — buat Google Cloud Task yang POST ke HTTP worker) untuk produksi. Call site pakai `get_task_queue().enqueue(name, *args)` sehingga transport bisa ditukar tanpa menyentuh kode bisnis.
+
+### 10. PostgreSQL performance lab + keyset pagination
+- **`db_lab/`** — sandbox terpisah dari skema app: `seed.py` memuat **1 juta baris** `order_events` via asyncpg `COPY` (~5 dtk); `queries.sql` menjalankan `EXPLAIN (ANALYZE, BUFFERS)` sebelum/sesudah tiap index; `NOTES.md` mencatat angkanya.
+- **4 optimasi terbukti dengan angka**: composite index (equality→range, ~150×), partial index (index 27× lebih kecil), covering index `INCLUDE` → Index Only Scan (~9×), keyset vs `OFFSET 500k` (~2000×). Plus 1 query analitik **CTE + `RANK() OVER (PARTITION BY month)`** ("3 pelanggan teratas per bulan").
+- **Diterapkan ke app** — `GET /orders` pindah dari `page/offset` ke **keyset** (`?limit=&after=<id>`): balas `{ items, next_cursor }`, PostgreSQL *seek* langsung lewat `orders_pkey` (tanpa `OFFSET`), biaya rata berapa pun dalamnya halaman. Frontend punya tombol "Muat lebih banyak →".
 
 ### Fondasi lintas fitur
 - **Desain sistem** (`apps/web/app/globals.css` + `apps/web/app/components/ui.tsx`): tema **light**, token Tailwind v4 `@theme`, hairline border, satu aksen violet, primitif bersama (`Card`, `Button`, `Badge`, `Table`, `Field`, …).
@@ -261,6 +266,7 @@ nextjs_python/
 │       │   ├── workers/              # ARQ: tasks, settings, queue
 │       │   └── prompts/
 │       ├── alembic/versions/         # migrasi
+│       ├── db_lab/                   # perf lab: seed 1M rows, queries.sql, NOTES.md
 │       ├── scripts/                  # seed_* + try_* (eksplorasi)
 │       └── tests/
 ├── docker-compose.yml                # db + redis + mailpit
@@ -348,7 +354,7 @@ Laporan harian: `SCHEDULER_ENABLED=true` di `.env` mengaktifkan cron 22:00; atau
 | `POST` | `/auth/login` | publik | email+password → JWT |
 | `GET` | `/auth/me` | login | profil user aktif |
 | `POST` | `/orders` | login | buat order manual → `201` |
-| `GET` | `/orders` | login | daftar berpaginasi |
+| `GET` | `/orders` | login | daftar — **keyset pagination** `?limit=&after=<id>` → `{ items, next_cursor }` |
 | `GET` | `/orders/{id}` | login | detail |
 | `POST` | `/orders/intake` | login | teks bebas → job → `202 {job_id}` · **rate-limited** (10/mnt) |
 | `POST` | `/orders/{id}/confirm` | login | `draft → confirmed`, buat langkah |
@@ -370,7 +376,7 @@ Laporan harian: `SCHEDULER_ENABLED=true` di `.env` mengaktifkan cron 22:00; atau
 cd apps/api && uv run pytest -q
 ```
 
-- **37 test**: `test_orders`, `test_intake`, `test_workflow`, `test_metrics`, `test_auth`, `test_ratelimit`, `test_internal`, `test_conversation`, `test_reports` (idempotensi laporan + PDF), `test_taskqueue` (LocalTaskQueue → ARQ, CloudTasksQueue = sketsa).
+- **38 test**: `test_orders` (termasuk keyset pagination), `test_intake`, `test_workflow`, `test_metrics`, `test_auth`, `test_ratelimit`, `test_internal`, `test_conversation`, `test_reports` (idempotensi laporan + PDF), `test_taskqueue` (LocalTaskQueue → ARQ, CloudTasksQueue = sketsa).
 - Database test terpisah (`tokobangunan_test`), tabel dibuat sekali, di-`TRUNCATE` sebelum tiap test.
 - HTTP diuji lewat `httpx.AsyncClient` + `ASGITransport` (tanpa menyalakan server).
 - LLM, queue, channel, dan SMTP **di-mock** dalam test (`monkeypatch`, `AsyncMock`) — test menguji logika aplikasi, bukan AI/jaringan.

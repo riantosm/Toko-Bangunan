@@ -29,7 +29,25 @@ async def test_create_order(client, product) -> None:
 async def test_list_orders_empty(client) -> None:
     r = await client.get("/orders")
     assert r.status_code == 200
-    assert r.json()["total"] == 0
+    body = r.json()
+    assert body["items"] == []
+    assert body["next_cursor"] is None
+
+
+async def test_list_orders_keyset_pagination(client, product) -> None:
+    for name in ("A", "B", "C"):
+        await client.post(
+            "/orders",
+            json={"customer_name": name, "items": [{"product_id": product.id, "quantity": 1}]},
+        )
+
+    page1 = (await client.get("/orders?limit=2")).json()
+    assert [o["customer_name"] for o in page1["items"]] == ["C", "B"]  # id desc
+    assert page1["next_cursor"] == page1["items"][-1]["id"]
+
+    page2 = (await client.get(f"/orders?limit=2&after={page1['next_cursor']}")).json()
+    assert [o["customer_name"] for o in page2["items"]] == ["A"]
+    assert page2["next_cursor"] is None  # short page -> no more
 
 
 async def test_get_missing_order_returns_404(client) -> None:

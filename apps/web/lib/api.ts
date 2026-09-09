@@ -43,7 +43,7 @@ export type OrderListRow = {
   id: number; customer_name: string; status: string; needs_review: boolean;
   item_count: number; created_at: string;
 };
-export type OrderList = { items: OrderListRow[]; total: number; page: number; size: number };
+export type OrderList = { items: OrderListRow[]; next_cursor: number | null };
 export type OrderItem = {
   id: number; product_id: number | null; raw_name: string | null;
   quantity: string; unit: string; matched_score: number | null;
@@ -94,7 +94,12 @@ export async function login(
 
 // ---- orders ----
 
-export const getOrders = (token?: string) => req<OrderList>("/orders", {}, token);
+export const getOrders = (after?: number, token?: string) =>
+  req<OrderList>(
+    `/orders?limit=20${after ? `&after=${after}` : ""}`,
+    {},
+    token,
+  );
 
 export async function getOrder(id: string, token?: string): Promise<Order | null> {
   const res = await fetch(`${API}/orders/${id}`, {

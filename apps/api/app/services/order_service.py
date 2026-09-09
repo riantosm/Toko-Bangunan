@@ -130,8 +130,12 @@ async def get_order(session: AsyncSession, order_id: int) -> Order:
     return order
 
 
-async def list_orders(session: AsyncSession, page: int, size: int) -> OrderListResponse:
-    rows, total = await order_repo.list_paginated(session, page, size)
+async def list_orders(
+    session: AsyncSession, limit: int, after: int | None
+) -> OrderListResponse:
+    rows = await order_repo.list_keyset(session, limit, after)
+    # full page returned -> there may be more; cursor = id of the last row
+    next_cursor = rows[-1].id if len(rows) == limit else None
     return OrderListResponse(
         items=[
             OrderListRow(
@@ -144,7 +148,5 @@ async def list_orders(session: AsyncSession, page: int, size: int) -> OrderListR
             )
             for o in rows
         ],
-        total=total,
-        page=page,
-        size=size,
+        next_cursor=next_cursor,
     )
