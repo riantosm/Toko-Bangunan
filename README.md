@@ -21,8 +21,8 @@ pencatatan durasi, dan manajemen memantau **dashboard SLA**.
 | 4 | Workflow + SLA (state machine, generated column) | ✅ |
 | 5 | Dashboard SLA (agregasi SQL, Recharts) | ✅ |
 | 6 | Auth (JWT + role, middleware, login/logout) | ✅ |
-| 7 | API hardening — rate limiting + error envelope + requestId | ⬜ |
-| 8 | Kanal WhatsApp — webhook + HMAC, auto-reply, state percakapan (dev pakai simulator) | ⬜ |
+| 7 | API hardening — rate limiting + error envelope + requestId + middleware JWT signature | ✅ |
+| 8 | Kanal WhatsApp — webhook + HMAC, auto-reply, state percakapan, simulator; departments/workflow_types | ✅ |
 | 9 | Laporan harian terjadwal (APScheduler → email) + abstraksi `TaskQueue` | ⬜ |
 | 10 | PostgreSQL performance lab — `EXPLAIN (ANALYZE, BUFFERS)`, index, partisi, CTE | ⬜ |
 | 11 | CI (GitHub Actions — lint + test) | ⬜ |
@@ -91,8 +91,21 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 - Proteksi per-router: `/metrics/*` → hanya `manager`/`admin`; sisanya → semua yang login.
 - Frontend:
   - Halaman `/login`, token disimpan di **cookie** (dibaca client *dan* server component).
-  - **`middleware.ts`** — cek keberadaan cookie (coarse check); verifikasi asli tetap di FastAPI.
+  - **`middleware.ts`** — verifikasi **signature + `exp` + `iss`** JWT pakai `jose` (Edge-compatible); token dipalsukan/kedaluwarsa → redirect `/login` + hapus cookie.
   - Server Component gate via `requireToken()` / `requireRole()`; tombol **Keluar** di nav.
+
+### 7. API hardening
+- **Error envelope seragam** — semua error (`401/403/404/409/422/429/500`) balas `{ "error": { "code", "message", "requestId", "details"? } }` lewat exception handler global; hierarki `ApiError` (`UnauthorizedError`, `NotFoundError`, `RateLimitError`, …).
+- **`requestId`** per request (contextvar) → header `X-Request-Id` + muncul di log.
+- **Structured logging** — 1 baris JSON per request (`method`, `path`, `status`, `duration_ms`, `request_id`).
+- **Rate limiting tanpa Redis** — tabel `rate_counters` + `INSERT … ON CONFLICT DO UPDATE count+1` per window 1 menit. `/orders/intake` dibatasi `settings.rate_limit_intake_per_min` (default 10); balas `429` + `Retry-After` + `X-RateLimit-*`.
+
+### 8. Kanal WhatsApp (chat pelanggan)
+- **Webhook = Next.js Route Handler** `app/api/webhooks/whatsapp/route.ts` — `GET` handshake Meta (echo `hub.challenge`); `POST` verifikasi **`X-Hub-Signature-256`** (HMAC-SHA256, `timingSafeEqual`) **sebelum** parsing → `401` kalau salah; forward tiap pesan ke FastAPI `POST /internal/wa-message` (header `X-Internal-Secret`).
+- **`conversation_service.handle_incoming`** — simpan pesan → get/create `conversations` (state per `wa_id`) → `"KONFIRMASI"` + draft aktif → `confirm_order` → selain itu `extract_order` + `match_product` → **merge item ke draft order percakapan** → balasan **template deterministik** → kirim via channel.
+- **`MessageChannel`** abstract: `MockChannel` (dev — tulis balasan ke `raw_messages`) vs `WhatsAppChannel` (Graph API, hanya jika `WHATSAPP_TOKEN` terisi).
+- **`/simulator`** — halaman + route handler `app/api/simulator/send` yang menandatangani payload berbentuk Cloud API lalu POST ke webhook asli → demo end-to-end **tanpa Meta**.
+- **`departments` + `workflow_types`** + partial index `workflow_steps (assignee_id, assigned_at) WHERE completed_at IS NULL`; `/metrics/*` menerima `?department_id=`, dashboard punya filter department.
 
 ### Fondasi lintas fitur
 - **Desain sistem** (`apps/web/app/globals.css` + `apps/web/app/components/ui.tsx`): tema **light**, token Tailwind v4 `@theme`, hairline border, satu aksen violet, primitif bersama (`Card`, `Button`, `Badge`, `Table`, `Field`, …).
@@ -105,29 +118,33 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 ## Arsitektur
 
 ```
-                       ┌───────────────────────────┐
-   Staff / Manajer     │   Next.js 16 (App Router)  │
-   ───────────────────>│   - /login (JWT → cookie) │
-                       │   - /orders, /dashboard    │  Server Components
-                       │   - middleware guard       │  ambil data di server
+   WhatsApp / Meta ─(webhook, HMAC)─┐
+                                    v
+   Staff / Manajer     ┌───────────────────────────┐
+   ───────────────────>│   Next.js 16 (App Router)  │
+                       │   - /login, /orders        │  Server Components
+                       │   - /dashboard, /simulator │  middleware verifikasi
+                       │   - route handlers:        │    signature JWT (jose)
+                       │     /api/webhooks/whatsapp  │
+                       │     /api/simulator/send     │
                        └────────────┬──────────────┘
-                                    │ HTTPS REST  (Authorization: Bearer <jwt>)
+                                    │ HTTPS REST (Bearer JWT) · /internal (X-Internal-Secret)
                                     v
                        ┌───────────────────────────┐
                        │   FastAPI (Python, async) │
-                       │   - /auth  /orders        │
-                       │   - /workflow  /metrics   │
-                       │   - get_current_user dep  │
+                       │   /auth /orders /workflow  │
+                       │   /metrics /internal       │  error envelope + requestId
+                       │   /conversations /jobs      │  rate limiter (rate_counters)
                        └───┬───────────┬──────────┬┘
         enqueue job        │           │          │  async SQLAlchemy
                            v           │          v
                  ┌──────────────┐      │   ┌──────────────┐
                  │ Worker (ARQ) │──────┼──>│ PostgreSQL 16│
-                 │ - LLM parse  │      │   │ + pg_trgm    │
-                 │ - match prod │      │   │ + generated  │
-                 └──────┬───────┘      │   │   column     │
-                        │ HTTP         │   └──────────────┘
-                        v              │
+                 │ intake +     │      │   │ + pg_trgm    │
+                 │ wa-message   │      │   │ + generated  │
+                 └──────┬───────┘      │   │   + partial  │
+                        │ HTTP         │   │     index    │
+                        v              │   └──────────────┘
                  ┌──────────────┐   ┌──┴───────────┐
                  │ Ollama       │   │ Redis        │
                  │ gemma3:4b/1b │   │ (broker ARQ) │
@@ -138,12 +155,13 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 
 | Dari | Ke | Cara |
 |---|---|---|
-| Browser | Next.js | HTTPS; data diambil di Server Component |
-| Next.js | FastAPI | HTTPS REST, header `Authorization: Bearer <jwt>` |
+| WhatsApp / Meta (atau simulator) | Next.js route handler | webhook `POST`, header `X-Hub-Signature-256` (HMAC-SHA256) |
+| Browser | Next.js | HTTPS; data diambil di Server Component; cookie JWT |
+| Next.js → FastAPI | REST | `Authorization: Bearer <jwt>` (user) atau `X-Internal-Secret` (`/internal/*`) |
 | FastAPI | PostgreSQL | connection pool async (`asyncpg`) |
 | FastAPI | Worker | enqueue job lewat Redis (ARQ) |
 | Worker | Ollama | HTTP `localhost:11434` (`/api/chat`, JSON mode) |
-| Worker | PostgreSQL | session async terpisah (bukan konteks request) |
+| Worker | Channel | `MockChannel` (dev) / `WhatsAppChannel` → Graph API |
 
 ---
 
@@ -160,15 +178,16 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 | Database | **PostgreSQL 16** (+ ekstensi **`pg_trgm`**, **generated column**, JSONB) | JOIN kompleks, agregasi, indexing, fuzzy match |
 | Background jobs | **ARQ** + **Redis 7** | Task async, proses worker terpisah, retry, idempotensi |
 | LLM lokal | **Ollama** + **Gemma 3** (`gemma3:4b` / `gemma3:1b`) | Ekstraksi order **tanpa biaya token** (Q1) |
-| Auth | **PyJWT** (HS256) + **Argon2** (`argon2-cffi`) — OAuth/OIDC *(rencana)* | Stateless, standar industri |
+| Auth | **PyJWT** (HS256) + **Argon2** (`argon2-cffi`); middleware Next.js verifikasi signature pakai **`jose`** — OAuth/OIDC *(rencana)* | Stateless, standar industri |
+| Rate limiting | tabel **`rate_counters`** + `INSERT … ON CONFLICT` (fixed window, tanpa Redis) | `429` + `Retry-After` + `X-RateLimit-*` |
+| Observability | **structured logging JSON** + `requestId` (contextvar → `X-Request-Id`) · Sentry *(rencana)* | Korelasi log ↔ response |
+| Kanal WhatsApp | **WhatsApp Cloud API** (Meta) shape + webhook **HMAC-SHA256** di Next.js route handler; dev pakai `/simulator` | Chat pelanggan → order otomatis |
 | Testing BE | **pytest** + **pytest-asyncio** + **httpx** (`ASGITransport`) — coverage *(rencana)* | Test API & unit tanpa menyalakan server |
 | Testing FE | **tsc --noEmit** + **ESLint** — Vitest / Playwright *(rencana, Fase 11)* | Type-check + unit/E2E |
 | Kualitas kode | **Ruff** + **mypy** (BE) · **ESLint** + **TypeScript strict** (FE) | Lint & type-check |
 | Kontainer | **Docker Compose** (Postgres, Redis) | Infrastruktur dev reproducible |
 | Version control | **Git** + **GitHub** — *Conventional Commits* | Riwayat rapi, commit kecil |
 | CI/CD | **GitHub Actions** *(rencana, Fase 11)* | Lint → test tiap PR |
-| Observability | structured logging JSON + `requestId` *(rencana, Fase 7)* · Sentry *(rencana)* | Debugging |
-| Kanal WhatsApp | **WhatsApp Cloud API** (Meta) + webhook **HMAC** *(rencana, Fase 8)* — dev pakai simulator | Chat pelanggan → order otomatis |
 | Cloud | **Vercel** (web) + **Cloud Run** (api) + **Cloud SQL** + **Cloud Tasks / Scheduler** *(rencana, Fase 13)* | Sesuai target produksi; demo jalan lokal |
 | AI coding assistant | **Claude Code** | Scaffolding, test, review |
 | Package manager | **uv** (Python) · **pnpm** (JS) | Cepat, lockfile deterministik |
@@ -191,22 +210,17 @@ nextjs_python/
 │   │   │   ├── components/
 │   │   │   │   ├── ui.tsx            # primitif design system
 │   │   │   │   └── user-menu.tsx
-│   │   │   ├── orders/
-│   │   │   │   ├── page.tsx          # daftar (RSC)
-│   │   │   │   ├── order-row.tsx     # baris klik-penuh (client)
-│   │   │   │   ├── new/page.tsx      # form manual (client)
-│   │   │   │   ├── intake/page.tsx   # form AI + progress (client)
-│   │   │   │   └── [id]/
-│   │   │   │       ├── page.tsx      # detail (RSC)
-│   │   │   │       └── workflow.tsx  # alur persetujuan (client)
-│   │   │   └── dashboard/
-│   │   │       ├── page.tsx          # RSC
-│   │   │       └── charts.tsx        # Recharts (client)
+│   │   │   ├── orders/               # daftar, new, intake, [id] + workflow.tsx
+│   │   │   ├── dashboard/            # RSC + charts.tsx (Recharts) + filter dept
+│   │   │   ├── simulator/page.tsx    # kirim pesan "sebagai pelanggan" (dev)
+│   │   │   └── api/
+│   │   │       ├── webhooks/whatsapp/route.ts   # verifikasi HMAC → FastAPI
+│   │   │       └── simulator/send/route.ts      # tanda-tangani payload → webhook
 │   │   ├── lib/
-│   │   │   ├── api.ts                # klien REST (Bearer otomatis)
+│   │   │   ├── api.ts                # klien REST (Bearer otomatis) + error envelope
 │   │   │   ├── auth.ts               # cookie session (client)
 │   │   │   └── guard.ts              # requireToken / requireRole (server)
-│   │   └── middleware.ts             # coarse auth guard
+│   │   └── middleware.ts             # verifikasi signature JWT (jose)
 │   └── api/                          # FastAPI
 │       ├── app/
 │       │   ├── main.py
@@ -214,15 +228,21 @@ nextjs_python/
 │       │   │   ├── config.py         # pydantic-settings
 │       │   │   ├── db.py             # engine + session async
 │       │   │   ├── security.py       # JWT + Argon2
-│       │   │   └── deps.py           # get_current_user / require_role
-│       │   ├── models/               # SQLAlchemy: user, product, order,
-│       │   │                         #   job, processed_request, workflow
+│       │   │   ├── deps.py           # get_current_user / require_role
+│       │   │   ├── errors.py         # ApiError hierarchy + handler global
+│       │   │   ├── logging.py        # RequestIdMiddleware + JSON logging
+│       │   │   └── ratelimit.py      # rate_limit() dependency (fixed window)
+│       │   ├── models/               # user, product, order, job, workflow,
+│       │   │                         #   processed_request, rate_counter,
+│       │   │                         #   conversation, raw_message, department
+│       │   ├── channels/             # MessageChannel: base, mock, whatsapp
 │       │   ├── schemas/              # Pydantic request/response
 │       │   ├── repositories/         # query DB
-│       │   ├── services/             # order, extraction, matching,
-│       │   │                         #   workflow, metrics
-│       │   ├── routers/              # auth, orders, products, jobs,
-│       │   │                         #   workflow, metrics
+│       │   ├── services/             # order, extraction, matching, workflow,
+│       │   │                         #   metrics, conversation
+│       │   ├── routers/              # auth, orders, products, jobs, workflow,
+│       │   │                         #   metrics, internal, conversations,
+│       │   │                         #   departments
 │       │   ├── workers/              # ARQ: tasks, settings, queue
 │       │   └── prompts/
 │       ├── alembic/versions/         # migrasi
@@ -257,6 +277,7 @@ uv run alembic upgrade head
 uv run python -m scripts.seed_products
 uv run python -m scripts.seed_step_types
 uv run python -m scripts.seed_users        # staff@toko.test / manajer@toko.test
+uv run python -m scripts.seed_departments  # 3 dept + workflow_type + backfill
 uv run python -m scripts.seed_demo         # data demo untuk dashboard
 
 # database test
@@ -272,7 +293,7 @@ cd apps/web && pnpm install
 |---|---|---|
 | 1 | `docker compose up` | Postgres + Redis |
 | 2 | `cd apps/api && uv run uvicorn app.main:app --reload --port 8000` | API — `localhost:8000/docs` |
-| 3 | `cd apps/api && uv run arq app.workers.settings.WorkerSettings` | Worker (job intake) |
+| 3 | `cd apps/api && uv run arq app.workers.settings.WorkerSettings` | Worker (intake + wa-message) |
 | 4 | `cd apps/web && pnpm dev` | Web — `localhost:3000` |
 
 (+ Ollama harus jalan: `brew services start ollama`.)
@@ -291,8 +312,12 @@ cd apps/web && pnpm install
 | `order_items` | id, order_id → orders (CASCADE), product_id → products (nullable), raw_name, quantity, unit, matched_score |
 | `jobs` | id (uuid), type, status, progress, result_ref, error, created_at, updated_at |
 | `processed_requests` | key (Idempotency-Key), response (JSONB), created_at |
+| `rate_counters` | bucket_key + window_start (PK), count — fixed-window rate limit |
 | `step_types` | id, name, seq, default_sla_minutes |
-| `workflow_steps` | id, order_id → orders (CASCADE), step_type_id, seq, assignee_id, assigned_at, completed_at, outcome, sla_target_minutes, **`elapsed_minutes` (generated)** |
+| `workflow_steps` | id, order_id → orders (CASCADE), step_type_id, seq, assignee_id, assigned_at, completed_at, outcome, sla_target_minutes, **`elapsed_minutes` (generated)**; index `(assignee_id, assigned_at) WHERE completed_at IS NULL` |
+| `departments`, `workflow_types` | id, name — dimensi query; `orders.department_id`/`workflow_type_id`, `users.department_id` |
+| `conversations` | wa_id (PK), customer_name, active_order_id → orders, context (JSONB), last_message_at |
+| `raw_messages` | id, channel, wa_id (index), direction (`in`/`out`), body, wa_message_id, created_at |
 
 ---
 
@@ -306,13 +331,16 @@ cd apps/web && pnpm install
 | `POST` | `/orders` | login | buat order manual → `201` |
 | `GET` | `/orders` | login | daftar berpaginasi |
 | `GET` | `/orders/{id}` | login | detail |
-| `POST` | `/orders/intake` | login | teks bebas → job → `202 {job_id}` |
+| `POST` | `/orders/intake` | login | teks bebas → job → `202 {job_id}` · **rate-limited** (10/mnt) |
 | `POST` | `/orders/{id}/confirm` | login | `draft → confirmed`, buat langkah |
 | `GET` | `/orders/{id}/steps` | login | daftar langkah workflow |
 | `POST` | `/workflow-steps/{id}/complete` | login | selesaikan langkah |
-| `GET` | `/products` | login | katalog produk |
+| `GET` | `/products` · `/departments` | login | katalog · daftar department |
 | `GET` | `/jobs/{id}` | login | status job (polling) |
-| `GET` | `/metrics/summary` · `/step-durations` · `/daily` · `/aging` | **manager** | agregasi dashboard |
+| `GET` | `/conversations/{wa_id}/messages` | login | thread WhatsApp (untuk simulator) |
+| `GET` | `/metrics/summary` · `/step-durations` · `/daily` · `/aging` | **manager** | agregasi dashboard; terima `?department_id=` |
+| `POST` | `/internal/wa-message` | `X-Internal-Secret` | pesan WhatsApp dari route handler → enqueue |
+| `GET`/`POST` | `/api/webhooks/whatsapp` *(Next.js)* | HMAC | handshake Meta · terima pesan (verifikasi `X-Hub-Signature-256`) |
 
 ---
 
@@ -322,8 +350,9 @@ cd apps/web && pnpm install
 cd apps/api && uv run pytest -q
 ```
 
-- **22 test**: `test_orders`, `test_intake`, `test_workflow`, `test_metrics`, `test_auth`.
+- **31 test**: `test_orders`, `test_intake`, `test_workflow`, `test_metrics`, `test_auth`, `test_ratelimit`, `test_internal`, `test_conversation`.
 - Database test terpisah (`tokobangunan_test`), tabel dibuat sekali, di-`TRUNCATE` sebelum tiap test.
 - HTTP diuji lewat `httpx.AsyncClient` + `ASGITransport` (tanpa menyalakan server).
-- LLM & queue **di-mock** dalam test (`monkeypatch`, `AsyncMock`) — test menguji logika aplikasi, bukan AI.
+- LLM, queue, dan channel **di-mock** dalam test (`monkeypatch`, `AsyncMock`) — test menguji logika aplikasi, bukan AI.
 - Fixture `client` sudah "login" sebagai manager; `anon_client` untuk menguji jalur `401`.
+- `ruff check` + `mypy` (BE), `tsc --noEmit` + `next build` (FE) semua lulus.
