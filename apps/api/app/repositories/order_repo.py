@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -10,14 +10,20 @@ async def get_by_id(session: AsyncSession, order_id: int) -> Order | None:
     return await session.scalar(stmt)
 
 
-async def list_paginated(session: AsyncSession, page: int, size: int) -> tuple[list[Order], int]:
-    total = await session.scalar(select(func.count()).select_from(Order)) or 0
+async def list_keyset(
+    session: AsyncSession, limit: int, after: int | None
+) -> list[Order]:
+    """Keyset pagination on the PK (newest first). `after` = last id from the
+    previous page; PostgreSQL seeks straight to it via `orders_pkey` — no OFFSET,
+    so cost stays flat no matter how deep the page. See db_lab/NOTES.md scenario D.
+    """
     stmt = (
         select(Order)
         .options(selectinload(Order.items))
         .order_by(Order.id.desc())
-        .limit(size)
-        .offset((page - 1) * size)
+        .limit(limit)
     )
+    if after is not None:
+        stmt = stmt.where(Order.id < after)
     rows = (await session.scalars(stmt)).all()
-    return list(rows), total
+    return list(rows)

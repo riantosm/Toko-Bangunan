@@ -13,15 +13,21 @@ import { OrderRow } from "./order-row";
 
 export const dynamic = "force-dynamic";
 
-export default async function OrdersPage() {
+export default async function OrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ after?: string }>;
+}) {
   const token = await requireToken();
-  const data = await getOrders(token);
+  const { after: afterParam } = await searchParams;
+  const after = afterParam ? Number(afterParam) : undefined;
+  const data = await getOrders(after, token);
 
   return (
     <PageShell>
       <PageHeader
         eyebrow="Daftar"
-        title={`Order (${data.total})`}
+        title="Order"
         action={
           <div className="flex gap-2">
             <ButtonLink href="/orders/intake" variant="primary">
@@ -55,6 +61,15 @@ export default async function OrdersPage() {
           ) : null}
         </tbody>
       </Table>
+
+      <div className="mt-4 flex gap-2">
+        {after ? <ButtonLink href="/orders">← Awal</ButtonLink> : null}
+        {data.next_cursor ? (
+          <ButtonLink href={`/orders?after=${data.next_cursor}`}>
+            Muat lebih banyak →
+          </ButtonLink>
+        ) : null}
+      </div>
     </PageShell>
   );
 }

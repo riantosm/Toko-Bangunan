@@ -49,11 +49,11 @@ async def intake_order(
 
 @router.get("", response_model=OrderListResponse)
 async def list_orders(
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
+    limit: int = Query(20, ge=1, le=100),
+    after: int | None = Query(None, ge=1, description="keyset cursor: last id of previous page"),
     session: AsyncSession = Depends(get_session),
 ) -> OrderListResponse:
-    return await order_service.list_orders(session, page, size)
+    return await order_service.list_orders(session, limit, after)
 
 
 @router.get("/{order_id}", response_model=OrderRead)
