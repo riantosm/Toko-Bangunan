@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import get_current_user
+from app.core.ratelimit import rate_limit
 from app.schemas.order import (
     OrderCreate,
     OrderIntakeRequest,
@@ -31,6 +32,9 @@ async def create_order(
     "/intake",
     response_model=OrderIntakeResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[
+        Depends(rate_limit(scope="intake", limit_setting="rate_limit_intake_per_min"))
+    ],
 )
 async def intake_order(
     payload: OrderIntakeRequest,

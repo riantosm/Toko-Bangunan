@@ -15,11 +15,17 @@ class ApiError(Exception):
     code = "bad_request"
 
     def __init__(
-        self, message: str, *, details: Any = None, code: str | None = None
+        self,
+        message: str,
+        *,
+        details: Any = None,
+        code: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
         self.details = details
+        self.headers = headers
         if code:
             self.code = code
 
@@ -82,6 +88,7 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=exc.status_code,
             content=_envelope(exc.code, exc.message, exc.details),
+            headers=exc.headers,
         )
 
     @app.exception_handler(StarletteHTTPException)
