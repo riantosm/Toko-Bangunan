@@ -1,6 +1,15 @@
 from datetime import datetime
 
-from sqlalchemy import Computed, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import (
+    Computed,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -17,6 +26,17 @@ class StepType(Base):
 
 class WorkflowStep(Base):
     __tablename__ = "workflow_steps"
+    __table_args__ = (
+        Index("ix_ws_steptype_assigned", "step_type_id", "assigned_at"),
+        # pending steps: the aging query filters assigned_at IS NOT NULL AND
+        # completed_at IS NULL, then orders by assigned_at
+        Index(
+            "ix_ws_pending",
+            "assignee_id",
+            "assigned_at",
+            postgresql_where=text("completed_at IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)

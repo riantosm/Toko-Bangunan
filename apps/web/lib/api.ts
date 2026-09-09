@@ -71,9 +71,10 @@ export type StepDuration = {
 };
 export type DailyPoint = { day: string; steps_done: number; sla_met_pct: string };
 export type AgingRow = {
-  order_id: number; customer_name: string; current_step: string;
-  waiting_minutes: string; sla_target_minutes: number;
+  order_id: number; customer_name: string; department: string | null;
+  current_step: string; waiting_minutes: string; sla_target_minutes: number;
 };
+export type Department = { id: number; name: string };
 
 // ---- auth ----
 
@@ -165,14 +166,32 @@ export const completeStep = (stepId: number, outcome: string, token?: string) =>
 
 // ---- metrics ----
 
-export const getSummary = (days: number, token?: string) =>
-  req<MetricsSummary>(`/metrics/summary?days=${days}`, {}, token);
-export const getStepDurations = (days: number, token?: string) =>
-  req<StepDuration[]>(`/metrics/step-durations?days=${days}`, {}, token);
-export const getDaily = (days: number, token?: string) =>
-  req<DailyPoint[]>(`/metrics/daily?days=${days}`, {}, token);
-export const getAging = (token?: string) =>
-  req<AgingRow[]>("/metrics/aging", {}, token);
+function dep(departmentId: number | null): string {
+  return departmentId ? `&department_id=${departmentId}` : "";
+}
+
+export const getDepartments = (token?: string) =>
+  req<Department[]>("/departments", {}, token);
+export const getSummary = (days: number, departmentId: number | null, token?: string) =>
+  req<MetricsSummary>(`/metrics/summary?days=${days}${dep(departmentId)}`, {}, token);
+export const getStepDurations = (
+  days: number,
+  departmentId: number | null,
+  token?: string,
+) =>
+  req<StepDuration[]>(
+    `/metrics/step-durations?days=${days}${dep(departmentId)}`,
+    {},
+    token,
+  );
+export const getDaily = (days: number, departmentId: number | null, token?: string) =>
+  req<DailyPoint[]>(`/metrics/daily?days=${days}${dep(departmentId)}`, {}, token);
+export const getAging = (departmentId: number | null, token?: string) =>
+  req<AgingRow[]>(
+    `/metrics/aging${departmentId ? `?department_id=${departmentId}` : ""}`,
+    {},
+    token,
+  );
 
 // ---- whatsapp / simulator ----
 

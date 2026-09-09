@@ -11,6 +11,7 @@ import {
 import {
   getAging,
   getDaily,
+  getDepartments,
   getStepDurations,
   getSummary,
 } from "@/lib/api";
@@ -25,18 +26,30 @@ const PRESETS = [7, 30, 90];
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ days?: string }>;
+  searchParams: Promise<{ days?: string; department?: string }>;
 }) {
   const token = await requireRole("manager", "admin");
-  const { days: daysParam } = await searchParams;
+  const { days: daysParam, department: deptParam } = await searchParams;
   const days = PRESETS.includes(Number(daysParam)) ? Number(daysParam) : 30;
+  const departmentId = deptParam ? Number(deptParam) : null;
 
+  const departments = await getDepartments(token);
   const [summary, steps, daily, aging] = await Promise.all([
-    getSummary(days, token),
-    getStepDurations(days, token),
-    getDaily(days, token),
-    getAging(token),
+    getSummary(days, departmentId, token),
+    getStepDurations(days, departmentId, token),
+    getDaily(days, departmentId, token),
+    getAging(departmentId, token),
   ]);
+
+  const qs = (over: Record<string, string | number | null>) => {
+    const p = new URLSearchParams({ days: String(days) });
+    if (departmentId) p.set("department", String(departmentId));
+    for (const [k, v] of Object.entries(over)) {
+      if (v == null) p.delete(k);
+      else p.set(k, String(v));
+    }
+    return `/dashboard?${p.toString()}`;
+  };
 
   return (
     <PageShell>
@@ -48,7 +61,7 @@ export default async function DashboardPage({
             {PRESETS.map((d) => (
               <ButtonLink
                 key={d}
-                href={`/dashboard?days=${d}`}
+                href={qs({ days: d })}
                 variant={d === days ? "primary" : "ghost"}
               >
                 {d}h
@@ -57,6 +70,24 @@ export default async function DashboardPage({
           </div>
         }
       />
+
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        <ButtonLink
+          href={qs({ department: null })}
+          variant={departmentId ? "ghost" : "primary"}
+        >
+          Semua dept
+        </ButtonLink>
+        {departments.map((d) => (
+          <ButtonLink
+            key={d.id}
+            href={qs({ department: d.id })}
+            variant={d.id === departmentId ? "primary" : "ghost"}
+          >
+            {d.name}
+          </ButtonLink>
+        ))}
+      </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Order masuk" value={summary.orders_total} />
@@ -91,6 +122,7 @@ export default async function DashboardPage({
           <tr>
             <Th>Order</Th>
             <Th>Pelanggan</Th>
+            <Th>Dept</Th>
             <Th>Langkah aktif</Th>
             <Th>Menunggu</Th>
           </tr>
@@ -102,6 +134,7 @@ export default async function DashboardPage({
               <tr key={r.order_id}>
                 <Td>#{r.order_id}</Td>
                 <Td>{r.customer_name}</Td>
+                <Td className="text-ink-3">{r.department ?? "—"}</Td>
                 <Td>{r.current_step}</Td>
                 <Td>
                   <span className="flex items-center gap-2">
@@ -118,6 +151,7 @@ export default async function DashboardPage({
             <tr>
               <Td>—</Td>
               <Td>tidak ada order menunggu</Td>
+              <Td>—</Td>
               <Td>—</Td>
               <Td>—</Td>
             </tr>
