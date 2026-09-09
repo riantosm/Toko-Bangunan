@@ -9,6 +9,7 @@ from app.core.logging import RequestIdMiddleware, configure_logging
 from app.routers import (
     auth,
     conversations,
+    departments,
     internal,
     jobs,
     metrics,
@@ -35,6 +36,7 @@ register_error_handlers(app)
 app.include_router(auth.router)
 app.include_router(internal.router)
 app.include_router(conversations.router)
+app.include_router(departments.router)
 app.include_router(orders.router)
 app.include_router(products.router)
 app.include_router(jobs.router)
