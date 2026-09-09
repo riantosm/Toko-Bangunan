@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-only-insecure-secret-change-me-please-32b+"
     rate_limit_intake_per_min: int = 10
     access_ttl_seconds: int = 28800
+    whatsapp_verify_token: str = "dev-verify-token"
+    whatsapp_app_secret: str = "dev-app-secret"
+    whatsapp_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    internal_api_secret: str = "dev-internal-secret"
 
 
 settings = Settings()  # type: ignore[call-arg]
