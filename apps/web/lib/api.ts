@@ -173,3 +173,30 @@ export const getDaily = (days: number, token?: string) =>
   req<DailyPoint[]>(`/metrics/daily?days=${days}`, {}, token);
 export const getAging = (token?: string) =>
   req<AgingRow[]>("/metrics/aging", {}, token);
+
+// ---- whatsapp / simulator ----
+
+export type WaMessage = {
+  id: number;
+  direction: "in" | "out";
+  body: string;
+  created_at: string;
+};
+
+export const getConversationMessages = (waId: string, token?: string) =>
+  req<WaMessage[]>(`/conversations/${encodeURIComponent(waId)}/messages`, {}, token);
+
+/** Calls our own Next route handler (which signs + posts to the webhook). */
+export async function simulatorSend(payload: {
+  wa_id: string;
+  name: string;
+  body: string;
+}): Promise<{ forwarded: number }> {
+  const res = await fetch("/api/simulator/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `simulator -> ${res.status}`));
+  return res.json();
+}

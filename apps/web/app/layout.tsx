@@ -41,6 +41,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 <Link href="/dashboard" className="transition-colors hover:text-ink">
                   Dashboard
                 </Link>
+                <Link href="/simulator" className="transition-colors hover:text-ink">
+                  Simulator
+                </Link>
               </nav>
             </div>
             <UserMenu />
