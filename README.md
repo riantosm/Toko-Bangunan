@@ -23,7 +23,7 @@ pencatatan durasi, dan manajemen memantau **dashboard SLA**.
 | 6 | Auth (JWT + role, middleware, login/logout) | ✅ |
 | 7 | API hardening — rate limiting + error envelope + requestId + middleware JWT signature | ✅ |
 | 8 | Kanal WhatsApp — webhook + HMAC, auto-reply, state percakapan, simulator; departments/workflow_types | ✅ |
-| 9 | Laporan harian terjadwal (APScheduler → email) + abstraksi `TaskQueue` | ⬜ |
+| 9 | Laporan harian terjadwal (APScheduler → PDF → email) + abstraksi `TaskQueue` | ✅ |
 | 10 | PostgreSQL performance lab — `EXPLAIN (ANALYZE, BUFFERS)`, index, partisi, CTE | ⬜ |
 | 11 | CI (GitHub Actions — lint + test) | ⬜ |
 | 12 | Evaluasi akurasi AI (gold set, metrik F1) | ⬜ |
@@ -107,6 +107,13 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 - **`/simulator`** — halaman + route handler `app/api/simulator/send` yang menandatangani payload berbentuk Cloud API lalu POST ke webhook asli → demo end-to-end **tanpa Meta**.
 - **`departments` + `workflow_types`** + partial index `workflow_steps (assignee_id, assigned_at) WHERE completed_at IS NULL`; `/metrics/*` menerima `?department_id=`, dashboard punya filter department.
 
+### 9. Laporan harian terjadwal + abstraksi `TaskQueue`
+- **`run_daily_report(session, day, *, force)`** — 1 hari: query ringkasan SQL (order masuk/confirmed/done/rejected, langkah selesai & lewat SLA, rata-rata menit, pecahan per jenis langkah) → **PDF** (`reportlab`, Python murni) → **email + lampiran** (`aiosmtplib` async) → ditangkap **Mailpit** (`localhost:8025`).
+- **Idempoten per tanggal** — tabel `report_runs` (PK = `report_date`); sudah terkirim → `status: skipped`. `?force=true` untuk kirim ulang manual.
+- **Endpoint `POST /internal/nightly-report`** (header `X-Internal-Secret`, opsional `?date=` & `?force=`) — "HTTP worker" yang dipanggil scheduler/Cloud Scheduler.
+- **APScheduler di `lifespan` FastAPI** — cron `0 22 * * *` (`Asia/Jakarta`, `misfire_grace_time=1h`) memanggil report; **digerbang `SCHEDULER_ENABLED`** (default `false`) — 1 proses, tanpa worker terpisah.
+- **`TaskQueue` ABC** (`app/core/taskqueue.py`) — jawaban **Q3**: `LocalTaskQueue` (push ke ARQ/Redis) dipakai demo & test; `CloudTasksQueue` (sketsa — buat Google Cloud Task yang POST ke HTTP worker) untuk produksi. Call site pakai `get_task_queue().enqueue(name, *args)` sehingga transport bisa ditukar tanpa menyentuh kode bisnis.
+
 ### Fondasi lintas fitur
 - **Desain sistem** (`apps/web/app/globals.css` + `apps/web/app/components/ui.tsx`): tema **light**, token Tailwind v4 `@theme`, hairline border, satu aksen violet, primitif bersama (`Card`, `Button`, `Badge`, `Table`, `Field`, …).
 - **Migrasi** semua lewat Alembic (autogenerate + edit manual untuk `pg_trgm` & generated column).
@@ -131,24 +138,26 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
                                     │ HTTPS REST (Bearer JWT) · /internal (X-Internal-Secret)
                                     v
                        ┌───────────────────────────┐
-                       │   FastAPI (Python, async) │
-                       │   /auth /orders /workflow  │
-                       │   /metrics /internal       │  error envelope + requestId
+   APScheduler ───────>│   FastAPI (Python, async) │
+   cron 22:00 (lifespan)│   /auth /orders /workflow  │
+   → nightly-report     │   /metrics /internal       │  error envelope + requestId
                        │   /conversations /jobs      │  rate limiter (rate_counters)
-                       └───┬───────────┬──────────┬┘
-        enqueue job        │           │          │  async SQLAlchemy
-                           v           │          v
-                 ┌──────────────┐      │   ┌──────────────┐
-                 │ Worker (ARQ) │──────┼──>│ PostgreSQL 16│
-                 │ intake +     │      │   │ + pg_trgm    │
-                 │ wa-message   │      │   │ + generated  │
-                 └──────┬───────┘      │   │   + partial  │
-                        │ HTTP         │   │     index    │
-                        v              │   └──────────────┘
-                 ┌──────────────┐   ┌──┴───────────┐
-                 │ Ollama       │   │ Redis        │
-                 │ gemma3:4b/1b │   │ (broker ARQ) │
-                 └──────────────┘   └──────────────┘
+                       │   TaskQueue (local ARQ /    │  laporan harian → PDF + email
+                       │     Cloud Tasks sketch)     │
+                       └───┬───────────┬──────┬───┬─┘
+        enqueue job        │           │      │   │ SMTP  ┌──────────────┐
+                           v           │      │   └──────>│ Mailpit      │
+                 ┌──────────────┐      │      │           │ :8025 (demo) │
+                 │ Worker (ARQ) │──────┼──────┤           └──────────────┘
+                 │ intake +     │      │      │  async SQLAlchemy
+                 │ wa-message   │      │      v
+                 └──────┬───────┘      │   ┌──────────────┐
+                        │ HTTP         │   │ PostgreSQL 16│
+                        v              │   │ + pg_trgm    │
+                 ┌──────────────┐   ┌──┴─┐ │ + generated  │
+                 │ Ollama       │   │Redis│ │   + partial  │
+                 │ gemma3:4b/1b │   │(ARQ)│ │     index    │
+                 └──────────────┘   └─────┘ └──────────────┘
 ```
 
 **Protokol antar komponen**
@@ -159,7 +168,9 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 | Browser | Next.js | HTTPS; data diambil di Server Component; cookie JWT |
 | Next.js → FastAPI | REST | `Authorization: Bearer <jwt>` (user) atau `X-Internal-Secret` (`/internal/*`) |
 | FastAPI | PostgreSQL | connection pool async (`asyncpg`) |
-| FastAPI | Worker | enqueue job lewat Redis (ARQ) |
+| FastAPI | Worker | `TaskQueue.enqueue()` → Redis (ARQ) lokal / Cloud Tasks (sketsa) |
+| APScheduler (lifespan) | FastAPI | panggil `run_daily_report` tiap 22:00 (`SCHEDULER_ENABLED`) |
+| FastAPI | Mailpit / SMTP | `aiosmtplib` — email laporan harian + lampiran PDF |
 | Worker | Ollama | HTTP `localhost:11434` (`/api/chat`, JSON mode) |
 | Worker | Channel | `MockChannel` (dev) / `WhatsAppChannel` → Graph API |
 
@@ -176,7 +187,8 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 | Validasi & config | **Pydantic v2** + **pydantic-settings** | Kontrak data ketat FE–BE, config dari env |
 | ORM / Migrasi | **SQLAlchemy 2.0** (async) + **Alembic** | Query kompleks + versioning schema |
 | Database | **PostgreSQL 16** (+ ekstensi **`pg_trgm`**, **generated column**, JSONB) | JOIN kompleks, agregasi, indexing, fuzzy match |
-| Background jobs | **ARQ** + **Redis 7** | Task async, proses worker terpisah, retry, idempotensi |
+| Background jobs | **ARQ** + **Redis 7**, di balik abstraksi **`TaskQueue`** (local ARQ / Cloud Tasks sketch) | Task async, proses worker terpisah, retry, idempotensi; transport bisa ditukar (Q3) |
+| Laporan terjadwal | **APScheduler** (cron di `lifespan`) + **reportlab** (PDF) + **aiosmtplib** (SMTP async) + **Mailpit** (dev) | Laporan harian SLA → PDF → email, idempoten per tanggal |
 | LLM lokal | **Ollama** + **Gemma 3** (`gemma3:4b` / `gemma3:1b`) | Ekstraksi order **tanpa biaya token** (Q1) |
 | Auth | **PyJWT** (HS256) + **Argon2** (`argon2-cffi`); middleware Next.js verifikasi signature pakai **`jose`** — OAuth/OIDC *(rencana)* | Stateless, standar industri |
 | Rate limiting | tabel **`rate_counters`** + `INSERT … ON CONFLICT` (fixed window, tanpa Redis) | `429` + `Retry-After` + `X-RateLimit-*` |
@@ -188,7 +200,7 @@ Demo dijalankan **lokal** (Docker + Ollama); Fase 13 (deploy) opsional.
 | Kontainer | **Docker Compose** (Postgres, Redis) | Infrastruktur dev reproducible |
 | Version control | **Git** + **GitHub** — *Conventional Commits* | Riwayat rapi, commit kecil |
 | CI/CD | **GitHub Actions** *(rencana, Fase 11)* | Lint → test tiap PR |
-| Cloud | **Vercel** (web) + **Cloud Run** (api) + **Cloud SQL** + **Cloud Tasks / Scheduler** *(rencana, Fase 13)* | Sesuai target produksi; demo jalan lokal |
+| Cloud | **Vercel** (web) + **Cloud Run** (api) + **Cloud SQL** + **Cloud Tasks / Scheduler** *(rencana, Fase 13 — `CloudTasksQueue` sudah disketsakan)* | Sesuai target produksi; demo jalan lokal |
 | AI coding assistant | **Claude Code** | Scaffolding, test, review |
 | Package manager | **uv** (Python) · **pnpm** (JS) | Cepat, lockfile deterministik |
 
@@ -231,11 +243,14 @@ nextjs_python/
 │       │   │   ├── deps.py           # get_current_user / require_role
 │       │   │   ├── errors.py         # ApiError hierarchy + handler global
 │       │   │   ├── logging.py        # RequestIdMiddleware + JSON logging
-│       │   │   └── ratelimit.py      # rate_limit() dependency (fixed window)
+│       │   │   ├── ratelimit.py      # rate_limit() dependency (fixed window)
+│       │   │   ├── taskqueue.py      # TaskQueue ABC: LocalTaskQueue / CloudTasksQueue
+│       │   │   └── scheduler.py      # lifespan + APScheduler cron laporan harian
 │       │   ├── models/               # user, product, order, job, workflow,
-│       │   │                         #   processed_request, rate_counter,
-│       │   │                         #   conversation, raw_message, department
+│       │   │                         #   processed_request, rate_counter, conversation,
+│       │   │                         #   raw_message, department, report_run
 │       │   ├── channels/             # MessageChannel: base, mock, whatsapp
+│       │   ├── reports/              # daily.py — ringkasan → PDF (reportlab) → email
 │       │   ├── schemas/              # Pydantic request/response
 │       │   ├── repositories/         # query DB
 │       │   ├── services/             # order, extraction, matching, workflow,
@@ -248,7 +263,7 @@ nextjs_python/
 │       ├── alembic/versions/         # migrasi
 │       ├── scripts/                  # seed_* + try_* (eksplorasi)
 │       └── tests/
-├── docker-compose.yml                # db + redis
+├── docker-compose.yml                # db + redis + mailpit
 └── README.md
 ```
 
@@ -291,12 +306,15 @@ cd apps/web && pnpm install
 
 | Terminal | Perintah | Untuk |
 |---|---|---|
-| 1 | `docker compose up` | Postgres + Redis |
+| 1 | `docker compose up` | Postgres + Redis + Mailpit (`localhost:8025` = inbox laporan) |
 | 2 | `cd apps/api && uv run uvicorn app.main:app --reload --port 8000` | API — `localhost:8000/docs` |
 | 3 | `cd apps/api && uv run arq app.workers.settings.WorkerSettings` | Worker (intake + wa-message) |
 | 4 | `cd apps/web && pnpm dev` | Web — `localhost:3000` |
 
 (+ Ollama harus jalan: `brew services start ollama`.)
+
+Laporan harian: `SCHEDULER_ENABLED=true` di `.env` mengaktifkan cron 22:00; atau picu manual —
+`curl -X POST localhost:8000/internal/nightly-report?force=true -H "X-Internal-Secret: dev-internal-secret"` lalu buka `localhost:8025`.
 
 **Login demo:** `staff@toko.test` / `staff123` · `manajer@toko.test` / `manajer123`
 
@@ -318,6 +336,7 @@ cd apps/web && pnpm install
 | `departments`, `workflow_types` | id, name — dimensi query; `orders.department_id`/`workflow_type_id`, `users.department_id` |
 | `conversations` | wa_id (PK), customer_name, active_order_id → orders, context (JSONB), last_message_at |
 | `raw_messages` | id, channel, wa_id (index), direction (`in`/`out`), body, wa_message_id, created_at |
+| `report_runs` | report_date (PK), sent_at, message_id — jejak laporan harian (idempotensi per tanggal) |
 
 ---
 
@@ -340,6 +359,7 @@ cd apps/web && pnpm install
 | `GET` | `/conversations/{wa_id}/messages` | login | thread WhatsApp (untuk simulator) |
 | `GET` | `/metrics/summary` · `/step-durations` · `/daily` · `/aging` | **manager** | agregasi dashboard; terima `?department_id=` |
 | `POST` | `/internal/wa-message` | `X-Internal-Secret` | pesan WhatsApp dari route handler → enqueue |
+| `POST` | `/internal/nightly-report` | `X-Internal-Secret` | build+kirim laporan harian; `?date=` `?force=` · idempoten per tanggal |
 | `GET`/`POST` | `/api/webhooks/whatsapp` *(Next.js)* | HMAC | handshake Meta · terima pesan (verifikasi `X-Hub-Signature-256`) |
 
 ---
@@ -350,9 +370,9 @@ cd apps/web && pnpm install
 cd apps/api && uv run pytest -q
 ```
 
-- **31 test**: `test_orders`, `test_intake`, `test_workflow`, `test_metrics`, `test_auth`, `test_ratelimit`, `test_internal`, `test_conversation`.
+- **37 test**: `test_orders`, `test_intake`, `test_workflow`, `test_metrics`, `test_auth`, `test_ratelimit`, `test_internal`, `test_conversation`, `test_reports` (idempotensi laporan + PDF), `test_taskqueue` (LocalTaskQueue → ARQ, CloudTasksQueue = sketsa).
 - Database test terpisah (`tokobangunan_test`), tabel dibuat sekali, di-`TRUNCATE` sebelum tiap test.
 - HTTP diuji lewat `httpx.AsyncClient` + `ASGITransport` (tanpa menyalakan server).
-- LLM, queue, dan channel **di-mock** dalam test (`monkeypatch`, `AsyncMock`) — test menguji logika aplikasi, bukan AI.
+- LLM, queue, channel, dan SMTP **di-mock** dalam test (`monkeypatch`, `AsyncMock`) — test menguji logika aplikasi, bukan AI/jaringan.
 - Fixture `client` sudah "login" sebagai manager; `anon_client` untuk menguji jalur `401`.
 - `ruff check` + `mypy` (BE), `tsc --noEmit` + `next build` (FE) semua lulus.
