@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import text
@@ -6,39 +6,47 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def _start(days: int) -> datetime:
-    return datetime.now(timezone.utc) - timedelta(days=days)
+    return datetime.now(UTC) - timedelta(days=days)
 
 
 async def summary(session: AsyncSession, days: int) -> dict[str, Any]:
     start = _start(days)
     orders = (
-        await session.execute(
-            text(
-                """
+        (
+            await session.execute(
+                text(
+                    """
                 SELECT
                   count(*) FILTER (WHERE created_at >= :start) AS total,
                   count(*) FILTER (WHERE status = 'done' AND created_at >= :start) AS done,
                   count(*) FILTER (WHERE status = 'confirmed') AS wip
                 FROM orders
                 """
-            ),
-            {"start": start},
+                ),
+                {"start": start},
+            )
         )
-    ).mappings().one()
+        .mappings()
+        .one()
+    )
 
     sla = (
-        await session.execute(
-            text(
-                """
+        (
+            await session.execute(
+                text(
+                    """
                 SELECT count(*) AS n,
                        count(*) FILTER (WHERE elapsed_minutes <= sla_target_minutes) AS met
                 FROM workflow_steps
                 WHERE completed_at IS NOT NULL AND completed_at >= :start
                 """
-            ),
-            {"start": start},
+                ),
+                {"start": start},
+            )
         )
-    ).mappings().one()
+        .mappings()
+        .one()
+    )
 
     return {
         "orders_total": orders["total"],
@@ -50,9 +58,10 @@ async def summary(session: AsyncSession, days: int) -> dict[str, Any]:
 
 async def step_durations(session: AsyncSession, days: int) -> list[dict[str, Any]]:
     rows = (
-        await session.execute(
-            text(
-                """
+        (
+            await session.execute(
+                text(
+                    """
                 SELECT st.name AS step_type,
                        count(*) AS n,
                        round(avg(ws.elapsed_minutes), 1) AS avg_minutes,
@@ -71,18 +80,22 @@ async def step_durations(session: AsyncSession, days: int) -> list[dict[str, Any
                 GROUP BY st.name, st.seq
                 ORDER BY st.seq
                 """
-            ),
-            {"start": _start(days)},
+                ),
+                {"start": _start(days)},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]
 
 
 async def daily(session: AsyncSession, days: int) -> list[dict[str, Any]]:
     rows = (
-        await session.execute(
-            text(
-                """
+        (
+            await session.execute(
+                text(
+                    """
                 SELECT to_char(date_trunc('day', completed_at), 'YYYY-MM-DD') AS day,
                        count(*) AS steps_done,
                        round(
@@ -94,18 +107,22 @@ async def daily(session: AsyncSession, days: int) -> list[dict[str, Any]]:
                 GROUP BY 1
                 ORDER BY 1
                 """
-            ),
-            {"start": _start(days)},
+                ),
+                {"start": _start(days)},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]
 
 
 async def aging(session: AsyncSession) -> list[dict[str, Any]]:
     rows = (
-        await session.execute(
-            text(
-                """
+        (
+            await session.execute(
+                text(
+                    """
                 SELECT ws.order_id,
                        o.customer_name,
                        st.name AS current_step,
@@ -119,7 +136,10 @@ async def aging(session: AsyncSession) -> list[dict[str, Any]]:
                 ORDER BY ws.assigned_at ASC
                 LIMIT 15
                 """
+                )
             )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]

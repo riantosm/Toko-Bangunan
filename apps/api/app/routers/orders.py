@@ -32,9 +32,7 @@ async def create_order(
     "/intake",
     response_model=OrderIntakeResponse,
     status_code=status.HTTP_202_ACCEPTED,
-    dependencies=[
-        Depends(rate_limit(scope="intake", limit_setting="rate_limit_intake_per_min"))
-    ],
+    dependencies=[Depends(rate_limit(scope="intake", limit_setting="rate_limit_intake_per_min"))],
 )
 async def intake_order(
     payload: OrderIntakeRequest,
@@ -59,8 +57,6 @@ async def list_orders(
 
 
 @router.get("/{order_id}", response_model=OrderRead)
-async def get_order(
-    order_id: int, session: AsyncSession = Depends(get_session)
-) -> OrderRead:
+async def get_order(order_id: int, session: AsyncSession = Depends(get_session)) -> OrderRead:
     order = await order_service.get_order(session, order_id)
     return OrderRead.model_validate(order)

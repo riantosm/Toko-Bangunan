@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Computed, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Computed, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -19,22 +19,12 @@ class WorkflowStep(Base):
     __tablename__ = "workflow_steps"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    order_id: Mapped[int] = mapped_column(
-        ForeignKey("orders.id", ondelete="CASCADE"), index=True
-    )
-    step_type_id: Mapped[int] = mapped_column(
-        ForeignKey("step_types.id"), index=True
-    )
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    step_type_id: Mapped[int] = mapped_column(ForeignKey("step_types.id"), index=True)
     seq: Mapped[int] = mapped_column(Integer)
-    assignee_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id"), default=None
-    )
-    assigned_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), default=None
-    )
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), default=None
-    )
+    assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None)
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     outcome: Mapped[str | None] = mapped_column(String(20), default=None)
     sla_target_minutes: Mapped[int] = mapped_column(Integer)
 

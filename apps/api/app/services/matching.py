@@ -6,9 +6,7 @@ from app.models.product import Product
 MATCH_THRESHOLD = 0.3
 
 
-async def match_product(
-    session: AsyncSession, raw_name: str
-) -> tuple[Product | None, float]:
+async def match_product(session: AsyncSession, raw_name: str) -> tuple[Product | None, float]:
     score_col = func.similarity(Product.name, raw_name)
     stmt = select(Product, score_col.label("score")).order_by(score_col.desc()).limit(1)
     row = (await session.execute(stmt)).first()

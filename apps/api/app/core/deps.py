@@ -18,12 +18,12 @@ async def get_current_user(
         raise UnauthorizedError("butuh login")
     try:
         payload = decode_token(creds.credentials)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise UnauthorizedError("token tidak valid / kedaluwarsa") from exc
 
     user = await session.get(User, int(payload["sub"]))
     if user is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "user tidak ditemukan")
+        raise UnauthorizedError("user tidak ditemukan")
     return user
 
 

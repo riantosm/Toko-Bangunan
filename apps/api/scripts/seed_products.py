@@ -27,8 +27,11 @@ async def main() -> None:
                 continue
             session.add(
                 Product(
-                    sku=sku, name=name, unit=unit,
-                    price=Decimal(price), stock_qty=stock,
+                    sku=sku,
+                    name=name,
+                    unit=unit,
+                    price=Decimal(price),
+                    stock_qty=stock,
                 )
             )
         await session.commit()

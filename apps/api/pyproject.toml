@@ -33,3 +33,12 @@ asyncio_default_test_loop_scope = "session"
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["B008"]  # FastAPI Depends() in defaults is intentional
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/*" = ["E501"]
+"tests/*" = ["S101"]
+"app/services/metrics_service.py" = ["E501"]  # embedded SQL strings

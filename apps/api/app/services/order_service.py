@@ -3,8 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.job import Job
-from app.models.processed_request import ProcessedRequest
 from app.models.order import Order, OrderItem
+from app.models.processed_request import ProcessedRequest
 from app.models.product import Product
 from app.repositories import order_repo
 from app.schemas.order import OrderCreate, OrderListResponse, OrderListRow
@@ -18,10 +18,7 @@ CONFIDENCE_THRESHOLD = 0.6
 async def create_order(session: AsyncSession, payload: OrderCreate) -> Order:
     product_ids = {i.product_id for i in payload.items}
     products = {
-        p.id: p
-        for p in await session.scalars(
-            select(Product).where(Product.id.in_(product_ids))
-        )
+        p.id: p for p in await session.scalars(select(Product).where(Product.id.in_(product_ids)))
     }
     missing = product_ids - products.keys()
     if missing:
@@ -62,9 +59,7 @@ async def enqueue_intake(
     await session.flush()
 
     if idempotency_key:
-        session.add(
-            ProcessedRequest(key=idempotency_key, response={"job_id": job.id})
-        )
+        session.add(ProcessedRequest(key=idempotency_key, response={"job_id": job.id}))
 
     await session.commit()
 
@@ -73,9 +68,7 @@ async def enqueue_intake(
     return job
 
 
-async def run_intake(
-    session: AsyncSession, job_id: str, customer_name: str, body: str
-) -> None:
+async def run_intake(session: AsyncSession, job_id: str, customer_name: str, body: str) -> None:
     job = await session.get(Job, job_id)
     if job is None:
         return
@@ -134,15 +127,11 @@ async def run_intake(
 async def get_order(session: AsyncSession, order_id: int) -> Order:
     order = await order_repo.get_by_id(session, order_id)
     if order is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="order tidak ditemukan"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order tidak ditemukan")
     return order
 
 
-async def list_orders(
-    session: AsyncSession, page: int, size: int
-) -> OrderListResponse:
+async def list_orders(session: AsyncSession, page: int, size: int) -> OrderListResponse:
     rows, total = await order_repo.list_paginated(session, page, size)
     return OrderListResponse(
         items=[

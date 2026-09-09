@@ -1,11 +1,10 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
-
-from app.core.deps import require_role
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
+from app.core.deps import require_role
 from app.services import metrics_service
 
 router = APIRouter(
@@ -18,9 +17,7 @@ Days = Query(30, ge=1, le=365)
 
 
 @router.get("/summary")
-async def summary(
-    days: int = Days, session: AsyncSession = Depends(get_session)
-) -> dict[str, Any]:
+async def summary(days: int = Days, session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
     return await metrics_service.summary(session, days)
 
 
